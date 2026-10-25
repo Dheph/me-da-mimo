@@ -560,3 +560,40 @@ dialog .actions { justify-content: flex-end; }
 .feature .btn.big { width: 100%; }
 @media (min-width: 560px) { .feature .btn.big { width: auto; } }
 .feature .btn.big { white-space: nowrap; }
+
+/* filters + paging */
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; margin-bottom: 1rem; }
+.seg { display: inline-flex; padding: 4px; gap: 4px; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; }
+.seg .btn { border-color: transparent; background: transparent; min-height: 40px; }
+.seg .btn[aria-pressed="true"] { background: var(--plum); color: #fff; }
+label.inline { flex: 0 1 auto; font-size: .875rem; }
+label.inline.grow { flex: 1 1 180px; }
+select {
+  font: inherit; font-weight: 500; color: var(--ink);
+  min-height: 48px; padding: .55rem 2.2rem .55rem .9rem; border: 1.5px solid var(--line); border-radius: 14px;
+  background: var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%232A0F1F' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right .8rem center;
+  appearance: none;
+}
+select:focus { outline: none; border-color: var(--pine); box-shadow: 0 0 0 4px rgb(31 94 59 / .16); }
+.btn.more { width: 100%; margin-top: -.5rem; }
+.btn.more .muted { font-weight: 500; }
+
+/* install / notifications nudge */
+.nudge { background: var(--plum); color: var(--on-dark); border-radius: var(--r-xl); padding: 1.4rem 1.25rem; margin-bottom: 1.5rem; box-shadow: var(--shadow); }
+.nudge h2 { color: #fff; font-size: 1.35rem; margin: 0 0 .5rem; }
+.nudge p { margin: 0 0 .9rem; }
+.nudge .muted { color: var(--on-dark-muted); }
+.nudge .btn.link { color: var(--on-dark-muted); }
+.nudge .btn.primary { background: var(--gold); border-color: var(--gold); color: var(--plum); }
+.howto { margin: 0 0 1rem; padding: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: .6rem; }
+.howto li { counter-increment: s; display: flex; align-items: center; gap: .75rem; background: rgb(255 255 255 / .07); border-radius: var(--r-md); padding: .7rem .85rem; line-height: 1.4; }
+.howto li::before { content: counter(s); flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--gold); color: var(--plum); font-weight: 800; }
+.howto .i, .key .i { width: 20px; height: 20px; vertical-align: -4px; }
+.key { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: #fff; color: #0A84FF; vertical-align: middle; }
+.nudge-slim {
+  display: flex; align-items: center; gap: .6rem; width: 100%; margin-bottom: 1.25rem; padding: .75rem 1rem;
+  font: inherit; font-weight: 600; text-align: left; color: var(--plum); cursor: pointer;
+  background: var(--gold-soft); border: 1.5px solid var(--gold); border-radius: var(--r-md);
+}
+.nudge-slim span { flex: 1; }
+.nudge-slim strong { color: var(--cherry-ink); white-space: nowrap; }

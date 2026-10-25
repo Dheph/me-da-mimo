@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import { registerSW, pushState, enablePush, disablePush } from './push.js';
+import { installed, canPrompt, promptInstall, inAppBrowser, platform } from './install.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const view = $('#view');
@@ -97,6 +98,9 @@ const ICONS = {
   crown: '<path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5z"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  share: '<path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>',
+  addsq: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/>',
+  dots: '<circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>',
   repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
 };
 const ico = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
@@ -306,23 +310,94 @@ const buyActions = {
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-// Everything on one screen: add my wish, my family, what I can buy, my wishes.
+const PAGE = 10;
+// Filters survive re-renders (e.g. after "Comprei este") for the whole session.
+const give = { owner: '', status: 'open', q: '', limit: PAGE };
+let mineLimit = PAGE;
+
+// Escapes LIKE wildcards so a typed "%" or "_" matches literally.
+const likeTerm = (q) => `%${q.replace(/[\\%_]/g, (c) => '\\' + c)}%`;
+
+const moreButton = (act, shown, total) => (total > shown
+  ? `<button class="btn more" data-act="${act}">Mostrar mais <span class="muted">(${shown} de ${total})</span></button>` : '');
+
+const giveItem = (g, mineBought) => `
+  <li class="item gift${mineBought ? ' bought' : ''}">
+    <span class="tile initial" aria-hidden="true">${initial(g.profiles?.name)}</span>
+    <div class="item-body"><span class="for">Para ${esc(g.profiles?.name ?? 'alguém')}</span>${giftBody(g)}</div>
+    <div class="actions">${mineBought
+      ? `<span class="seal">Você comprou ✔</span><button class="btn small" data-act="undo" data-id="${esc(g.id)}">Desfazer</button>`
+      : `<button class="btn primary" data-act="buy" data-id="${esc(g.id)}">${ico('check')} Comprei este</button>`}</div>
+  </li>`;
+
+const mineItem = (g) => `
+  <li class="item gift">
+    ${tile('gift')}
+    <div class="item-body">
+      ${giftBody(g)}
+      ${g.purchased ? '<p class="seal">Alguém já comprou 🎉</p>' : ''}
+    </div>
+    <div class="actions">
+      <button class="btn small" data-act="edit" data-id="${esc(g.id)}">Editar</button>
+      <button class="btn small danger" data-act="del" data-id="${esc(g.id)}">Apagar</button>
+    </div>
+  </li>`;
+
+// "Presentes para dar": server-side filter + page, so a big family never renders everything at once.
+async function loadGive(box) {
+  const token = (box.token = (box.token ?? 0) + 1);
+  const cols = 'id, title, url, note, purchased, owner_id, created_at, profiles(name)';
+  let rows, count;
+  if (give.status === 'mine') {
+    let q = supabase.from('purchases').select(`created_at, gifts!inner(${cols})`, { count: 'exact' }).eq('buyer_id', me.id);
+    if (give.owner) q = q.eq('gifts.owner_id', give.owner);
+    if (give.q) q = q.ilike('gifts.title', likeTerm(give.q));
+    ({ data: rows, count } = ok2(await q.order('created_at', { ascending: false }).range(0, give.limit - 1)));
+    rows = rows.map((r) => r.gifts);
+  } else {
+    let q = supabase.from('gifts').select(cols, { count: 'exact' }).neq('owner_id', me.id).eq('purchased', false);
+    if (give.owner) q = q.eq('owner_id', give.owner);
+    if (give.q) q = q.ilike('title', likeTerm(give.q));
+    ({ data: rows, count } = ok2(await q.order('created_at', { ascending: false }).range(0, give.limit - 1)));
+  }
+  if (token !== box.token) return; // a newer filter already answered
+  box.innerHTML = rows.length
+    ? `<ul class="list">${rows.map((g) => giveItem(g, give.status === 'mine')).join('')}</ul>${moreButton('moreGive', rows.length, count)}`
+    : emptyState('gift', give.q || give.owner ? 'Nada encontrado' : give.status === 'mine' ? 'Você ainda não marcou nenhuma compra' : 'Nada para comprar agora',
+      give.q || give.owner ? 'Tente outro nome ou mostre todas as pessoas.' : give.status === 'mine'
+        ? 'Quando você tocar em “Comprei este”, o presente aparece aqui.'
+        : 'Quando alguém da família fizer um pedido, ele aparece aqui.');
+}
+
+async function loadMine(box) {
+  const { data: rows, count } = ok2(await supabase.from('gifts').select('id, title, url, note, purchased', { count: 'exact' })
+    .eq('owner_id', me.id).order('created_at', { ascending: false }).range(0, mineLimit - 1));
+  box.rows = rows;
+  box.innerHTML = rows.length
+    ? `<ul class="list">${rows.map(mineItem).join('')}</ul>${moreButton('moreMine', rows.length, count)}`
+    : emptyState('gift', 'Você ainda não pediu nada', 'Toque em “Adicionar meu pedido” lá em cima.');
+}
+
+// Like ok(), but keeps the count of a { count: 'exact' } query.
+function ok2({ data, count, error }) {
+  if (error) throw error;
+  return { data, count };
+}
+
+// Everything on one screen: install/notify nudge, add my wish, my family, what I can give, my wishes.
 async function home() {
-  const [gifts, people, fams] = await Promise.all([
-    supabase.from('gifts').select('id, title, url, note, purchased, owner_id, profiles(name)').order('created_at').then(ok),
+  const [people, fams, counts] = await Promise.all([
     supabase.from('profiles').select('id, name').neq('id', me.id).order('name').then(ok),
     supabase.from('families').select('id, owner_id').order('created_at').then(ok),
+    supabase.from('gifts').select('owner_id').neq('owner_id', me.id).then(ok),
   ]);
-  const mine = gifts.filter((g) => g.owner_id === me.id);
-  const others = gifts.filter((g) => g.owner_id !== me.id);
-  const buyOf = await purchasesOf(others);
-  // Hide what someone else already bought: this list is "what can I still give?".
-  const toGive = others.filter((g) => !g.purchased || buyOf[g.id]?.buyer_id === me.id);
-  const wishesOf = (id) => others.filter((g) => g.owner_id === id).length;
+  if (give.owner && !people.some((p) => p.id === give.owner)) give.owner = '';
+  const wishesOf = (id) => counts.filter((g) => g.owner_id === id).length;
   const myFam = fams.find((f) => f.owner_id === me.id);
   const addPeople = myFam ? `<a class="btn small" href="#/familia/${esc(myFam.id)}">${ico('plus')} Adicionar pessoa</a>` : '';
 
   const el = section(`
+    <div id="nudge"></div>
     <p class="hello">Oi, ${esc(me.name)}! 🎄</p>
     <div class="feature">
       <h2>O que você quer ganhar?</h2>
@@ -332,7 +407,7 @@ async function home() {
 
     <section class="block" aria-labelledby="h-fam">
       <div class="head"><h2 id="h-fam">Minha família</h2>${addPeople}</div>
-      ${people.length ? `<p class="muted">Toque numa pessoa para ver os pedidos dela.</p>
+      ${people.length ? `<p class="muted">Toque numa pessoa para ver todos os pedidos dela.</p>
       <ul class="list people">${people.map((p) => `
         <li><a class="item link-item" href="#/pessoa/${esc(p.id)}">
           <span class="tile initial" aria-hidden="true">${initial(p.name)}</span>
@@ -344,46 +419,59 @@ async function home() {
     </section>
 
     <section class="block" aria-labelledby="h-give">
-      <div class="head"><h2 id="h-give">Presentes para dar</h2><span class="chip">${toGive.length}</span></div>
-      ${toGive.length ? `<p class="muted">Comprou algum? Toque em “Comprei este”. Quem vai ganhar não fica sabendo que foi você.</p>
-      <ul class="list">${toGive.map((g) => `
-        <li class="item gift">
-          <span class="tile initial" aria-hidden="true">${initial(g.profiles?.name)}</span>
-          <div class="item-body"><span class="for">Para ${esc(g.profiles?.name ?? 'alguém')}</span>${giftBody(g)}</div>
-          <div class="actions">${buyStatus(g, buyOf)}</div>
-        </li>`).join('')}</ul>`
-      : emptyState('gift', others.length ? 'Tudo já foi comprado! 🎉' : 'Ninguém fez pedido ainda', others.length
-        ? 'Quando alguém pedir algo novo, aparece aqui.'
-        : 'Quando alguém da família fizer um pedido, ele aparece aqui.')}
+      <div class="head"><h2 id="h-give">Presentes para dar</h2></div>
+      <p class="muted">Comprou algum? Toque em “Comprei este”. Quem vai ganhar não fica sabendo que foi você.</p>
+      <div class="filters" role="group" aria-label="Filtrar presentes">
+        <div class="seg" role="group" aria-label="Mostrar">
+          <button class="btn small" data-act="status" data-id="open" aria-pressed="${give.status === 'open'}">Para comprar</button>
+          <button class="btn small" data-act="status" data-id="mine" aria-pressed="${give.status === 'mine'}">Que eu comprei</button>
+        </div>
+        ${people.length > 1 ? `<label class="inline">Pessoa
+          <select id="f-owner"><option value="">Todas</option>${people.map((p) =>
+            `<option value="${esc(p.id)}"${p.id === give.owner ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+        </label>` : ''}
+        <label class="inline grow">Procurar
+          <input id="f-q" type="search" value="${esc(give.q)}" placeholder="Ex.: livro" autocomplete="off" enterkeyhint="search">
+        </label>
+      </div>
+      <div id="give" aria-live="polite"></div>
     </section>
 
     <section class="block" aria-labelledby="h-mine">
-      <div class="head"><h2 id="h-mine">Meus pedidos</h2><span class="chip">${mine.length}</span></div>
-      ${mine.length ? `<ul class="list">${mine.map((g) => `
-        <li class="item gift">
-          ${tile('gift')}
-          <div class="item-body">
-            ${giftBody(g)}
-            ${g.purchased ? '<p class="seal">Alguém já comprou 🎉</p>' : ''}
-          </div>
-          <div class="actions">
-            <button class="btn small" data-act="edit" data-id="${esc(g.id)}">Editar</button>
-            <button class="btn small danger" data-act="del" data-id="${esc(g.id)}">Apagar</button>
-          </div>
-        </li>`).join('')}</ul>`
-      : emptyState('gift', 'Você ainda não pediu nada', 'Toque em “Adicionar meu pedido” lá em cima.')}
+      <div class="head"><h2 id="h-mine">Meus pedidos</h2></div>
+      <div id="mine"></div>
     </section>`);
+
+  const giveBox = $('#give', el);
+  const mineBox = $('#mine', el);
+  const refilter = () => { give.limit = PAGE; return loadGive(giveBox); };
+  let typing;
+  $('#f-q', el).oninput = (e) => {
+    clearTimeout(typing);
+    typing = setTimeout(() => { give.q = e.target.value.trim(); refilter().catch((err) => toast(friendly(err))); }, 300);
+  };
+  const owner = $('#f-owner', el);
+  if (owner) owner.onchange = () => { give.owner = owner.value; refilter().catch((err) => toast(friendly(err))); };
+
   on(el, {
     ...buyActions,
+    status: (v) => {
+      give.status = v;
+      for (const b of el.querySelectorAll('[data-act=status]')) b.setAttribute('aria-pressed', b.dataset.id === v);
+      return refilter();
+    },
+    moreGive: () => { give.limit += PAGE; return loadGive(giveBox); },
+    moreMine: () => { mineLimit += PAGE; return loadMine(mineBox); },
     add: () => giftDialog(),
-    edit: (id) => giftDialog(mine.find((g) => g.id === id)),
+    edit: (id) => giftDialog(mineBox.rows.find((g) => g.id === id)),
     del: async (id) => {
-      const g = mine.find((x) => x.id === id);
+      const g = mineBox.rows.find((x) => x.id === id);
       if (!confirm(`Apagar o pedido "${g.title}"?`)) return;
       ok(await supabase.from('gifts').delete().eq('id', id));
       render();
     },
   });
+  await Promise.all([loadGive(giveBox), loadMine(mineBox), nudge($('#nudge', el))]);
   return el;
 }
 
@@ -548,7 +636,8 @@ async function person(id) {
   }
   const [p, gifts] = await Promise.all([
     supabase.from('profiles').select('name').eq('id', id).maybeSingle().then(ok),
-    supabase.from('gifts').select('id, title, url, note, purchased').eq('owner_id', id).order('created_at').then(ok),
+    // shortcut: one person's list capped at 100, add paging if someone ever asks for more
+    supabase.from('gifts').select('id, title, url, note, purchased').eq('owner_id', id).order('created_at').limit(100).then(ok),
   ]);
   if (!p) return section('<a class="back" href="#/">← Início</a><p class="empty">Pessoa não encontrada.</p>');
   const buyOf = await purchasesOf(gifts);
@@ -572,11 +661,13 @@ async function person(id) {
   return el;
 }
 
+let alertsLimit = 20;
+
 async function alerts() {
-  const list = ok(await supabase.from('notifications')
-    .select('id, title, body, url, read_at, created_at')
+  const { data: list, count } = ok2(await supabase.from('notifications')
+    .select('id, title, body, url, read_at, created_at', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(100));
+    .range(0, alertsLimit - 1));
   const el = section(`
     <div class="head">
       <h2>Alertas</h2>
@@ -590,9 +681,10 @@ async function alerts() {
           <span>${esc(n.body)}</span>
           <small>${fmtDate(n.created_at)}${n.read_at ? '' : ' <span class="chip">nova</span>'}</small>
         </span>
-      </button></li>`).join('')}</ul>`
+      </button></li>`).join('')}</ul>${moreButton('more', list.length, count)}`
     : emptyState('bell', 'Nenhum alerta por enquanto', 'Quando alguém da família adicionar um presente ou comprar um mimo seu, o aviso aparece aqui.')}`);
   on(el, {
+    more: () => { alertsLimit += 20; return render(); },
     open: async (id) => {
       const n = list.find((x) => String(x.id) === id);
       if (!n.read_at) ok(await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', n.id));
@@ -613,11 +705,77 @@ const PUSH_TEXT = {
   default: 'Receba um aviso quando a família adicionar presentes ou alguém comprar um mimo seu.',
 };
 
+// Permission "granted" survives unsubscribing, so check the real subscription.
+const subscribedHere = async () => !!(await navigator.serviceWorker
+  ?.getRegistration().then((r) => r?.pushManager.getSubscription()).catch(() => null));
+
+// ---------- install / notifications nudge ----------
+// Push only really works installed (iPhone: only installed), so we keep asking until it's done.
+// "Agora não" shrinks the card to a one-line reminder for a day; it never fully disappears.
+
+const DAY = 24 * 60 * 60 * 1000;
+const snoozed = () => { try { return Date.now() - Number(localStorage.getItem('mimo_nudge')) < DAY; } catch { return false; } };
+const setSnooze = (on) => { try { on ? localStorage.setItem('mimo_nudge', Date.now()) : localStorage.removeItem('mimo_nudge'); } catch { /* private mode */ } };
+
+const steps = (items) => `<ol class="howto">${items.map((t) => `<li>${t}</li>`).join('')}</ol>`;
+const later = '<button class="btn link" data-act="snooze">Agora não</button>';
+
+function installCard() {
+  const intro = '<h2>Coloque o Me Dá Mimo no seu celular</h2><p>Fica um ícone na tela, abre como app e <strong>avisa você</strong> quando a família pedir algo ou comprar o seu presente.</p>';
+  if (inAppBrowser()) return `<div class="nudge">${intro}
+    ${steps([`Toque nos três pontinhos ${ico('dots')} no canto da tela.`, 'Escolha <strong>Abrir no navegador</strong> (Chrome ou Safari).', 'Lá aparece o botão para instalar.'])}
+    <div class="actions"><button class="btn primary" data-act="copyLink">Copiar o link</button>${later}</div></div>`;
+  if (canPrompt()) return `<div class="nudge">${intro}
+    <div class="actions"><button class="btn primary big" data-act="install">${ico('phone')} Instalar agora</button>${later}</div></div>`;
+  if (platform() === 'ios') return `<div class="nudge">${intro}
+    ${steps([`Toque no botão <strong>Compartilhar</strong> <span class="key">${ico('share')}</span> (no Safari, fica embaixo).`,
+      `Role e toque em <strong>Adicionar à Tela de Início</strong> <span class="key">${ico('addsq')}</span>.`,
+      'Toque em <strong>Adicionar</strong> e abra o Me Dá Mimo pelo ícone novo.'])}
+    <div class="actions">${later}</div></div>`;
+  if (platform() === 'android') return `<div class="nudge">${intro}
+    ${steps([`Toque no menu <span class="key">${ico('dots')}</span> do navegador (no canto de cima).`,
+      'Escolha <strong>Instalar app</strong> ou <strong>Adicionar à tela inicial</strong>.', 'Confirme e abra o Me Dá Mimo pelo ícone novo.'])}
+    <div class="actions">${later}</div></div>`;
+  return `<div class="nudge">${intro}
+    <p>O melhor é abrir este site <strong>no seu celular</strong>. No computador, use o ícone de instalar na barra de endereço.</p>
+    <div class="actions">${later}</div></div>`;
+}
+
+const PUSH_DENIED = {
+  ios: 'No iPhone: Ajustes → Notificações → Me Dá Mimo → Permitir Notificações.',
+  android: 'No Android: segure o ícone do Me Dá Mimo → Informações do app → Notificações → Permitir.',
+  desktop: 'Clique no cadeado ao lado do endereço e permita as notificações.',
+};
+
+async function nudge(box) {
+  let html = '';
+  if (!installed()) {
+    html = snoozed() ? `<button class="nudge-slim" data-act="unsnooze">${ico('phone')}<span>Instale o app para receber os avisos da família</span><strong>Ver como</strong></button>` : installCard();
+  } else {
+    const state = pushState();
+    if (state === 'denied') html = `<div class="nudge"><h2>Os avisos estão bloqueados</h2><p>Sem eles você não fica sabendo dos pedidos da família.</p><p class="muted">${PUSH_DENIED[platform()]}</p></div>`;
+    else if (state !== 'unsupported' && !(state === 'granted' && await subscribedHere())) {
+      html = snoozed() ? `<button class="nudge-slim" data-act="notify">${ico('bell')}<span>Ative os avisos para saber dos pedidos</span><strong>Ativar</strong></button>`
+        : `<div class="nudge"><h2>Falta só ativar os avisos 🔔</h2><p>Assim você fica sabendo na hora quando alguém pedir algo ou comprar o seu presente.</p>
+          <div class="actions"><button class="btn primary big" data-act="notify">${ico('bell')} Ativar avisos</button>${later}</div></div>`;
+    }
+  }
+  box.innerHTML = html;
+  if (box.wired) return;
+  box.wired = true;
+  on(box, {
+    install: async () => { if (await promptInstall()) toast('Pronto! Abra o Me Dá Mimo pelo ícone 🎄'); return nudge(box); },
+    snooze: () => { setSnooze(true); return nudge(box); },
+    unsnooze: () => { setSnooze(false); return nudge(box); },
+    notify: async () => { try { await enablePush(supabase); toast('Avisos ativados! 🔔'); } finally { await nudge(box); } },
+    copyLink: async () => { await navigator.clipboard.writeText(location.origin + location.pathname); toast('Link copiado! Cole no Chrome ou Safari.'); },
+  });
+}
+addEventListener('mimo:installable', () => { const box = $('#nudge'); if (box) nudge(box); });
+
 async function pushBox(box) {
   const state = pushState();
-  // Permission "granted" survives unsubscribing, so check the real subscription.
-  const subscribed = state === 'granted' && !!(await navigator.serviceWorker
-    ?.getRegistration().then((r) => r?.pushManager.getSubscription()).catch(() => null));
+  const subscribed = state === 'granted' && await subscribedHere();
   const text = state === 'granted' ? (subscribed ? 'Notificações ativadas neste aparelho. ✔' : 'Notificações desativadas neste aparelho.') : PUSH_TEXT[state];
   const button = subscribed ? '<button class="btn" data-act="pushOff">Desativar notificações</button>'
     : state === 'default' || state === 'granted' ? '<button class="btn primary" data-act="pushOn">Ativar notificações</button>' : '';

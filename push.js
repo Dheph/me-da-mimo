@@ -3,9 +3,9 @@ export async function registerSW() {
   if ('serviceWorker' in navigator) return navigator.serviceWorker.register('./sw.js', { scope: './' });
 }
 
-const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+export const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS se diz Mac
-const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+export const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
 export function pushState() {
   if (isIOS() && !standalone()) return 'needs-install'; // iOS só tem push no PWA instalado
