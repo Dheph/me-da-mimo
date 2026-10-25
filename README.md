@@ -16,9 +16,10 @@ https://dheph.github.io/me-da-mimo/
 - `supabase/migrations/` — schema + RLS. `supabase/functions/push/` — edge function que envia o Web Push.
 
 ## Configuração única no Supabase (Dashboard → Authentication)
-1. **URL Configuration** → Site URL: `https://dheph.github.io/me-da-mimo/` (e adicionar em Redirect URLs).
-2. **Email Templates** → em "Magic Link" e "Confirm signup", incluir o código: `Seu código: {{ .Token }}`.
-3. (Recomendado) **SMTP** próprio: o SMTP padrão do Supabase envia poucos e-mails por hora.
+1. ✅ **URL Configuration** → Site URL `https://dheph.github.io/me-da-mimo/` e Redirect URL `https://dheph.github.io/me-da-mimo/**`.
+2. **SMTP próprio** (ex.: Resend) em Emails → SMTP Settings. Sem ele o Supabase não deixa editar templates e envia poucos e-mails por hora.
+3. Depois do SMTP: em "Magic link or OTP" e "Confirm sign up", incluir `Seu código: {{ .Token }}`. Até lá o login é só pelo link do e-mail,
+   que precisa ser aberto no mesmo navegador onde o e-mail foi pedido (no iPhone com o app instalado isso não acontece — por isso o código).
 
 ## Rodar local
 Qualquer servidor estático na pasta, ex.: `python3 -m http.server`.

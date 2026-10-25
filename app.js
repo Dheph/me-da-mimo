@@ -170,8 +170,9 @@ function login() {
       <button type="submit" class="btn primary">Enviar código</button>
     </form>
     <form id="f-code" class="card stack" ${email ? '' : 'hidden'}>
-      <p><strong>Verifique seu e-mail!</strong> Enviamos um código para <strong id="sent-to">${esc(email)}</strong>.</p>
-      <label>Código de 6 dígitos
+      <p><strong>Verifique seu e-mail!</strong> Enviamos um acesso para <strong id="sent-to">${esc(email)}</strong>.
+        Toque no link do e-mail <strong>neste mesmo navegador</strong> ou, se vier um código, digite abaixo.</p>
+      <label>Código (se o e-mail trouxer)
         <input name="token" required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" maxlength="10">
       </label>
       <button type="submit" class="btn primary">Entrar</button>
