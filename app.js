@@ -717,7 +717,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const snoozed = () => { try { return Date.now() - Number(localStorage.getItem('mimo_nudge')) < DAY; } catch { return false; } };
 const setSnooze = (on) => { try { on ? localStorage.setItem('mimo_nudge', Date.now()) : localStorage.removeItem('mimo_nudge'); } catch { /* private mode */ } };
 
-const steps = (items) => `<ol class="howto">${items.map((t) => `<li>${t}</li>`).join('')}</ol>`;
+const steps = (items) => `<ol class="howto">${items.map((t) => `<li><span>${t}</span></li>`).join('')}</ol>`;
 const later = '<button class="btn link" data-act="snooze">Agora não</button>';
 
 function installCard() {
