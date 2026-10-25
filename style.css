@@ -43,7 +43,8 @@ p { margin: 0 0 .75rem; }
 .top h1 { font-size: 1.35rem; margin: 0; }
 .top img { border-radius: 50%; background: #fff; }
 
-main { max-width: 640px; margin: 0 auto; padding: 1.25rem 1rem; outline: none; }
+main { max-width: 640px; margin: 0 auto; padding: 1.25rem 1rem; }
+main:focus { outline: none; } /* focused by script on route change, for screen readers only */
 
 .stack { display: flex; flex-direction: column; gap: .75rem; }
 .stack > * { margin: 0; }
