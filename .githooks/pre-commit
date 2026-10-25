@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Bloqueia commits com segredos. Ativar uma vez: git config core.hooksPath .githooks
+set -euo pipefail
+added=$(git diff --cached -U0 --no-color -- . ':(exclude).githooks' | grep '^+' | grep -v '^+++' || true)
+fail() { echo "pre-commit: $1 — commit bloqueado." >&2; exit 1; }
+
+git diff --cached --name-only | grep -E '(^|/)\.env(\.|$)|\.(pem|key|p12)$' && fail "arquivo de segredo no stage"
+echo "$added" | grep -E 'sb_secret_|-----BEGIN [A-Z ]*PRIVATE KEY|SUPABASE_SERVICE_ROLE_KEY *=' >/dev/null && fail "chave secreta no diff"
+
+# JWT do Supabase: só a anon pode ir pro repo.
+for jwt in $(echo "$added" | grep -oE 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+' || true); do
+  p=$(echo "$jwt" | cut -d. -f2 | tr '_-' '/+'); while [ $(( ${#p} % 4 )) -ne 0 ]; do p="$p="; done
+  echo "$p" | base64 -d 2>/dev/null | grep -q '"role":"anon"' || fail "JWT que não é anon (service_role?)"
+done
+exit 0

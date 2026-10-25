@@ -1,0 +1,21 @@
+# OS / editor
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Segredos — nunca versionar (a anon key em config.js é pública por design)
+.env
+.env.*
+*.pem
+*.key
+*.p12
+supabase/.env*
+supabase/.temp/
+supabase/.branches/
+**/service-account*.json
+
+# Local
+node_modules/
+.brain
+.claude/settings.local.json

@@ -21,7 +21,7 @@ async function vapid() {
 Deno.serve(async () => {
   try {
     const keys = await vapid();
-    webpush.setVapidDetails('mailto:dheph.lage@gmail.com', keys.vapid_public_key, keys.vapid_private_key);
+    webpush.setVapidDetails('https://dheph.github.io/me-da-mimo/', keys.vapid_public_key, keys.vapid_private_key);
 
     const { data: pending, error } = await db.from('notifications').select('id')
       .is('pushed_at', null).order('created_at').limit(200);
