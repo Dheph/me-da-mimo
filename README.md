@@ -1,23 +1,72 @@
 # Me Dá Mimo 🎁
 
-Lista de presentes de Natal em família. PWA estático (GitHub Pages) + Supabase.
+Lista de presentes de Natal em família — sem presente repetido e sem estragar a surpresa.
 
-https://dheph.github.io/me-da-mimo/
+**No ar:** https://dheph.github.io/me-da-mimo/
 
-- Login com e-mail e senha (sem confirmação por e-mail).
-- Quem cria a família adiciona membros pelo e-mail: quem já tem conta entra na hora; quem não tem entra ao criar a conta com aquele e-mail (link `#/criar-conta`). O dono remove membros.
-- Cada um monta a própria lista (com link). A família recebe alerta quando entra presente novo.
-- Quem compra marca "Comprei este"; o dono recebe o alerta, mas nunca vê quem comprou.
-- Notificações push (no iPhone, só com o app adicionado à Tela de Início).
+## Como funciona
 
-## Estrutura
-- `index.html`, `app.js`, `style.css`, `supabase.js`, `config.js` — app (sem build).
-- `push.js`, `sw.js`, `manifest.webmanifest`, `icons/` — PWA e push.
-- `supabase/migrations/` — schema + RLS. `supabase/functions/push/` — edge function que envia o Web Push.
+1. **O admin cria a conta e a família** (em "Criar conta" → *Admin da família*).
+2. **O admin adiciona as pessoas pelo e-mail.** Quem já tem conta entra na hora; quem não tem entra
+   automaticamente ao criar a conta com aquele e-mail (link `#/criar-conta`, opção *Membro da família*).
+3. **Cada um monta a própria lista**, com link da loja e observação. O admin também é membro e tem lista.
+4. **A família recebe um alerta** quando alguém adiciona um presente.
+5. **Quem compra toca em "Comprei este".** O presenteado recebe o aviso de que alguém comprou, mas
+   nunca vê quem foi. Os outros membros veem, para não comprar repetido.
 
-## Configuração no Supabase (Dashboard → Authentication)
-- URL Configuration: Site URL `https://dheph.github.io/me-da-mimo/`, Redirect `https://dheph.github.io/me-da-mimo/**`.
-- Sign In / Providers → Email: "Confirm email" desligado (v1 sem e-mails; religar exige SMTP próprio por causa do limite de envio).
+Funciona como app no celular (PWA): "Adicionar à Tela de Início". No iPhone, as notificações push só
+funcionam com o app instalado assim (iOS 16.4+).
+
+## Perfis
+
+| | Admin | Membro |
+|---|---|---|
+| Tem a própria lista e compra presentes | ✅ | ✅ |
+| Adiciona e remove membros, apaga a família | ✅ | — |
+| Sai da família | — (apaga a família) | ✅ |
+
+"Admin" é quem criou a família; uma pessoa pode ser admin de uma família e membro de outra.
+
+## Stack
+
+Site estático, sem build, no GitHub Pages + Supabase (Postgres, Auth, Edge Functions).
+
+| Arquivo | Papel |
+|---|---|
+| `index.html`, `app.js`, `style.css` | App (rotas por hash, telas) |
+| `supabase.js`, `config.js` | Cliente Supabase (URL + anon key, públicas) |
+| `push.js`, `sw.js`, `manifest.webmanifest`, `icons/` | PWA e Web Push |
+| `supabase/migrations/` | Schema, RLS e triggers (aplicar em ordem) |
+| `supabase/functions/push/` | Edge function que envia o push (chaves VAPID no Vault) |
+
+Toda regra de acesso está no banco (RLS + funções `security definer`): o frontend só usa a anon key.
 
 ## Rodar local
-Qualquer servidor estático na pasta, ex.: `python3 -m http.server`.
+
+```bash
+python3 -m http.server 8000
+```
+
+Abra http://localhost:8000. O app fala direto com o Supabase de produção.
+
+## Configuração do Supabase (já feita)
+
+- Authentication → URL Configuration: Site URL `https://dheph.github.io/me-da-mimo/`, Redirect `https://dheph.github.io/me-da-mimo/**`.
+- Authentication → Sign In / Providers → Email: **Confirm email desligado** (a v1 não envia e-mail).
+  Para religar, configure antes um SMTP próprio — o padrão do Supabase envia poucos e-mails por hora.
+
+## Segurança
+
+- Nunca versione `service_role`, `sb_secret_…`, `.env` ou chaves privadas. A anon key em `config.js` é pública por design.
+- Ative o hook que bloqueia segredos em commits (uma vez por clone):
+
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+
+## Limitações conhecidas (v1)
+
+- Sem confirmação de e-mail: quem se cadastrar com o e-mail de outra pessoa entra na família dela.
+- Sem "Esqueci a senha" no app — redefinir pelo Dashboard do Supabase (Authentication → Users).
+
+© 2026 Me Dá Mimo

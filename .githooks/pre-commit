@@ -5,7 +5,7 @@ added=$(git diff --cached -U0 --no-color -- . ':(exclude).githooks' | grep '^+' 
 fail() { echo "pre-commit: $1 — commit bloqueado." >&2; exit 1; }
 
 git diff --cached --name-only | grep -E '(^|/)\.env(\.|$)|\.(pem|key|p12)$' && fail "arquivo de segredo no stage"
-echo "$added" | grep -E 'sb_secret_|-----BEGIN [A-Z ]*PRIVATE KEY|SUPABASE_SERVICE_ROLE_KEY *=' >/dev/null && fail "chave secreta no diff"
+echo "$added" | grep -E 'sb_secret_[A-Za-z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY|SUPABASE_SERVICE_ROLE_KEY *=' >/dev/null && fail "chave secreta no diff"
 
 # JWT do Supabase: só a anon pode ir pro repo.
 for jwt in $(echo "$added" | grep -oE 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+' || true); do
