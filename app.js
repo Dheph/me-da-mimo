@@ -98,8 +98,8 @@ async function render(focus = false) {
   const token = ++seq;
   const hash = location.hash;
   nav.hidden = !user;
-  if (!user) return show(login(hash === '#/criar-conta'), focus);
-  if (hash === '#/criar-conta') return go('#/');
+  if (!user) return show(hash === '#/entrar' ? login(false) : hash === '#/criar-conta' ? login(true) : landing(), focus);
+  if (hash === '#/entrar' || hash === '#/criar-conta') return go('#/');
 
   const route = routes.find(([re]) => re.test(hash));
   if (!route) return go('#/');
@@ -135,12 +135,30 @@ async function updateBadge() {
 
 // ---------- views ----------
 
+// Public home for logged-out visitors.
+function landing() {
+  return section(`
+    <h2>Me Dá Mimo</h2>
+    <p>Lista de presentes de Natal da família.</p>
+    <p><a class="btn primary" href="#/criar-conta">Criar conta</a> <a class="btn" href="#/entrar">Entrar</a></p>`);
+}
+
 function login(signup) {
   const el = section(`
     <h2>${signup ? 'Criar conta' : 'Entrar'}</h2>
-    ${signup ? '<p class="banner">🎄 Use o mesmo e-mail que a sua família cadastrou: você já entra nela.</p>' : ''}
     <form id="f-auth" class="card stack">
-      ${signup ? `<label>Seu nome
+      ${signup ? `<fieldset class="roles">
+        <legend>Como você vai usar?</legend>
+        <label class="role"><input type="radio" name="role" value="admin" checked>
+          <span><strong>Admin da família</strong> Crio a família e adiciono as pessoas pelo e-mail. Também tenho minha lista.</span></label>
+        <label class="role"><input type="radio" name="role" value="member">
+          <span><strong>Membro da família</strong> Alguém da família já adicionou meu e-mail.</span></label>
+      </fieldset>
+      <label data-role="admin">Nome da família
+        <input name="family" maxlength="80" pattern=".*\\S.*" placeholder="Ex.: Família Silva" required>
+      </label>
+      <p class="banner" data-role="member" hidden>🎄 Use o mesmo e-mail que o admin cadastrou: você já entra na família.</p>
+      <label>Seu nome
         <input name="name" required maxlength="60" pattern=".*\\S.*" autocomplete="name">
       </label>` : ''}
       <label>E-mail
@@ -151,13 +169,23 @@ function login(signup) {
       </label>
       <button type="submit" class="btn primary">${signup ? 'Criar conta' : 'Entrar'}</button>
     </form>
-    <p class="muted">${signup ? 'Já tem conta? <a href="#/">Entrar</a>' : 'Primeira vez? <a href="#/criar-conta">Criar conta</a>'}</p>`);
+    <p class="muted">${signup ? 'Já tem conta? <a href="#/entrar">Entrar</a>' : 'Primeira vez? <a href="#/criar-conta">Criar conta</a>'}</p>`);
   const form = $('#f-auth', el);
+  if (signup) {
+    const family = form.elements.family;
+    form.onchange = () => {
+      const role = form.elements.role.value;
+      for (const x of form.querySelectorAll('[data-role]')) x.hidden = x.dataset.role !== role;
+      family.required = role === 'admin';
+    };
+  }
   // Success fires onAuthStateChange, which renders the app.
   form.onsubmit = submit(form, async (f) => {
     const email = f.email.trim();
     if (!signup) return ok(await supabase.auth.signInWithPassword({ email, password: f.password }));
-    const data = ok(await supabase.auth.signUp({ email, password: f.password, options: { data: { name: f.name.trim() } } }));
+    // The DB trigger creates the family (admin) or joins the inviting ones (member).
+    const meta = { name: f.name.trim(), ...(f.role === 'admin' && { family_name: f.family.trim() }) };
+    const data = ok(await supabase.auth.signUp({ email, password: f.password, options: { data: meta } }));
     if (!data.session) toast('Conta criada! Confirme pelo link no seu e-mail e depois entre.');
   });
   return el;
@@ -232,7 +260,7 @@ async function families() {
     <h2>Famílias</h2>
     ${fams.length ? `<ul class="list">${fams.map((f) => `
       <li><a class="card row" href="#/familia/${esc(f.id)}">
-        <span>${esc(f.name)}</span>${f.owner_id === me.id ? '<span class="tag">você criou</span>' : ''}
+        <span>${esc(f.name)}</span>${f.owner_id === me.id ? '<span class="tag admin">Admin</span>' : ''}
       </a></li>`).join('')}</ul>`
     : '<p class="empty">Você ainda não está em nenhuma família. Crie uma ou peça um link de convite!</p>'}
     <form id="f-fam" class="card stack">
@@ -268,7 +296,7 @@ async function family(id) {
     <ul class="list">${members.map((m) => `
       <li class="card row">
         <a href="${m.user_id === me.id ? '#/' : '#/pessoa/' + esc(m.user_id)}">${esc(nameOf(m))}${m.user_id === me.id ? ' (você)' : ''}</a>
-        ${m.user_id === fam.owner_id ? '<span class="tag">dono</span>'
+        ${m.user_id === fam.owner_id ? '<span class="tag admin">Admin</span>'
           : owner ? `<button class="btn small danger" data-act="remove" data-id="${esc(m.user_id)}">Remover</button>` : ''}
       </li>`).join('')}</ul>
     ${owner ? `
