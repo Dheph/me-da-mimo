@@ -5,18 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Me Dá Mimo</title>
   <meta name="description" content="Lista de presentes de Natal da família.">
-  <meta name="theme-color" content="#C8102E">
+  <meta name="theme-color" content="#FFF8F0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Me Dá Mimo">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..800&display=swap">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="app.js"></script>
 </head>
 <body>
   <header class="top">
-    <img src="icons/logo.png" alt="" width="36" height="36">
+    <img src="icons/logo.png" alt="" width="40" height="40">
     <h1>Me Dá Mimo</h1>
   </header>
 
@@ -26,10 +29,10 @@
   </main>
 
   <nav id="nav" class="tabs" aria-label="Navegação principal" hidden>
-    <a href="#/" data-tab="home"><span class="ico" aria-hidden="true">🎁</span>Minha lista</a>
-    <a href="#/familias" data-tab="familias"><span class="ico" aria-hidden="true">👪</span>Famílias</a>
-    <a href="#/alertas" data-tab="alertas" id="nav-alerts"><span class="ico" aria-hidden="true">🔔</span>Alertas<span id="badge" class="badge" aria-hidden="true" hidden></span></a>
-    <a href="#/perfil" data-tab="perfil"><span class="ico" aria-hidden="true">👤</span>Perfil</a>
+    <a href="#/" data-tab="home"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9"/><path d="M2 7h20v5H2z"/><path d="M12 21V7"/><path d="M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z"/></svg><span class="lbl">Minha lista</span></a>
+    <a href="#/familias" data-tab="familias"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="lbl">Famílias</span></a>
+    <a href="#/alertas" data-tab="alertas" id="nav-alerts"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="lbl">Alertas</span><span id="badge" class="badge" aria-hidden="true" hidden></span></a>
+    <a href="#/perfil" data-tab="perfil"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="lbl">Perfil</span></a>
   </nav>
 
   <dialog id="gift-dialog" aria-labelledby="gift-dialog-title">

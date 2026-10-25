@@ -83,6 +83,27 @@ const giftBody = (g) => {
   return `<h3>${title}</h3>${g.note ? `<p class="note">${esc(g.note)}</p>` : ''}`;
 };
 
+// Inline stroke icons (24×24), styled by .i in style.css.
+const ICONS = {
+  gift: '<path d="M20 12v9H4v-9"/><path d="M2 7h20v5H2z"/><path d="M12 21V7"/><path d="M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  home: '<path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  mail: '<rect x="2" y="4" width="20" height="16" rx="3"/><path d="m22 7-10 6L2 7"/>',
+  list: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
+  bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  phone: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>',
+  crown: '<path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5z"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
+};
+const ico = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+const tile = (name, extra = '') => `<span class="tile${extra}" aria-hidden="true">${ico(name)}</span>`;
+const initial = (name) => esc((String(name ?? '').trim()[0] ?? '?').toUpperCase());
+const emptyState = (icon, title, text) => `<div class="empty">${tile(icon, ' big')}<p><strong>${title}</strong>${text}</p></div>`;
+
 // ---------- router ----------
 
 const routes = [
@@ -138,21 +159,85 @@ async function updateBadge() {
 // Public home for logged-out visitors.
 function landing() {
   return section(`
-    <h2>Me Dá Mimo</h2>
-    <p>Lista de presentes de Natal da família.</p>
-    <p><a class="btn primary" href="#/criar-conta">Criar conta</a> <a class="btn" href="#/entrar">Entrar</a></p>`);
+    <div class="landing">
+      <div class="hero">
+        <div class="hero-copy">
+          <h2>Natal sem presente repetido e sem “o que você quer ganhar?”</h2>
+          <p class="lead">Cada pessoa da família monta sua lista de mimos. Quem vai presentear escolhe um, marca que comprou, e a surpresa continua guardada até a noite de Natal.</p>
+          <div class="actions">
+            <a class="btn primary big" href="#/criar-conta">Criar minha família</a>
+            <a class="btn big" href="#/entrar">Já tenho conta</a>
+          </div>
+          <p class="muted small">É grátis e funciona direto no navegador do celular.</p>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <img src="icons/logo.png" alt="" width="148" height="148">
+          <div class="mock">
+            <div class="mock-item">${tile('gift')}<span><strong>Livro de receitas</strong><small>Capa dura, se tiver</small></span></div>
+            <div class="mock-item">${tile('bag')}<span><strong>Pantufa quentinha</strong><small class="seal">Alguém já comprou 🎉</small></span></div>
+          </div>
+        </div>
+      </div>
+
+      <section class="panel how" aria-labelledby="how-title">
+        <h2 id="how-title">Como funciona</h2>
+        <ol class="steps">
+          <li>${tile('users')}<div><h3>O admin cria a família</h3><p>Quem organiza o Natal cria a família e adiciona cada pessoa pelo e-mail.</p></div></li>
+          <li>${tile('list')}<div><h3>Cada um monta sua lista</h3><p>Coloque o que você quer ganhar, com o link da loja e detalhes como tamanho, cor ou modelo.</p></div></li>
+          <li>${tile('bell')}<div><h3>A família fica sabendo</h3><p>Entrou presente novo numa lista? Todo mundo da família recebe um alerta.</p></div></li>
+          <li>${tile('check')}<div><h3>Comprou, marcou “Comprei”</h3><p>O presenteado recebe o aviso de que alguém comprou, sem saber quem foi. A surpresa fica guardada.</p></div></li>
+        </ol>
+      </section>
+
+      <section class="roles-info" aria-labelledby="roles-title">
+        <h2 id="roles-title">Um organiza, todo mundo participa</h2>
+        <div class="duo">
+          <div class="card">${tile('crown')}<h3>Admin da família</h3><p>Cria a família, adiciona e remove pessoas. E também é membro: tem a própria lista e ganha presente como todo mundo.</p></div>
+          <div class="card">${tile('mail')}<h3>Membro</h3><p>Não precisa configurar nada. Crie sua conta com o mesmo e-mail que o admin cadastrou e você já entra na família.</p></div>
+        </div>
+      </section>
+
+      <section aria-labelledby="perks-title">
+        <h2 id="perks-title">Feito para o Natal em família</h2>
+        <ul class="perks">
+          <li>${tile('repeat')}<div><h3>Sem presente repetido</h3><p>Quando alguém marca que comprou, o resto da família já vê que aquele item foi.</p></div></li>
+          <li>${tile('lock')}<div><h3>Segredo garantido</h3><p>Você fica sabendo que ganhou algo da sua lista, nunca quem comprou.</p></div></li>
+          <li>${tile('phone')}<div><h3>Funciona como app</h3><p>Abra no celular e adicione à tela inicial. Sem baixar nada da loja.</p></div></li>
+          <li>${tile('bell')}<div><h3>Avisos na hora</h3><p>Receba notificação quando entrar presente novo ou alguém comprar um mimo seu.</p></div></li>
+        </ul>
+      </section>
+
+      <section class="faq" aria-labelledby="faq-title">
+        <h2 id="faq-title">Perguntas frequentes</h2>
+        <div class="stack">
+          <details><summary>É grátis?</summary><p>Sim. É só criar a conta e começar a montar a lista.</p></details>
+          <details><summary>Quem vê quem comprou cada presente?</summary><p>O resto da família vê, para ninguém comprar a mesma coisa. Quem vai ganhar só vê o selo “Alguém já comprou”, sem o nome.</p></details>
+          <details><summary>Preciso instalar alguma coisa?</summary><p>Não. Funciona no navegador. Se quiser, adicione à tela inicial para abrir como um app.</p></details>
+          <details><summary>Uso iPhone. Recebo as notificações?</summary><p>Sim, no iOS 16.4 ou mais novo. No Safari, toque em Compartilhar → Adicionar à Tela de Início, abra o Me Dá Mimo pelo ícone e ative as notificações no Perfil.</p></details>
+        </div>
+      </section>
+
+      <div class="closing">
+        <h2>Bora montar a lista deste Natal?</h2>
+        <a class="btn primary big" href="#/criar-conta">Criar minha família</a>
+      </div>
+
+      <footer class="foot">© 2026 Me Dá Mimo · Feito com carinho para o Natal em família</footer>
+    </div>`);
 }
 
 function login(signup) {
   const el = section(`
-    <h2>${signup ? 'Criar conta' : 'Entrar'}</h2>
+    <div class="auth">
+    <h2>${signup ? 'Criar conta' : 'Que bom te ver de novo'}</h2>
+    <p class="muted">${signup ? 'Leva menos de um minuto. Depois é só montar sua lista.' : 'Entre para ver sua lista e a da sua família.'}</p>
     <form id="f-auth" class="card stack">
       ${signup ? `<fieldset class="roles">
         <legend>Como você vai usar?</legend>
         <label class="role"><input type="radio" name="role" value="admin" checked>
-          <span><strong>Admin da família</strong> Crio a família e adiciono as pessoas pelo e-mail. Também tenho minha lista.</span></label>
+          ${tile('crown')}<span><strong>Admin da família</strong> Crio a família e adiciono as pessoas pelo e-mail. Também tenho minha lista.</span></label>
         <label class="role"><input type="radio" name="role" value="member">
-          <span><strong>Membro da família</strong> Alguém da família já adicionou meu e-mail.</span></label>
+          ${tile('mail')}<span><strong>Membro da família</strong> Alguém da família já adicionou meu e-mail.</span></label>
       </fieldset>
       <label data-role="admin">Nome da família
         <input name="family" maxlength="80" pattern=".*\\S.*" placeholder="Ex.: Família Silva" required>
@@ -167,9 +252,10 @@ function login(signup) {
       <label>Senha
         <input name="password" type="password" required minlength="6" autocomplete="${signup ? 'new-password' : 'current-password'}">
       </label>
-      <button type="submit" class="btn primary">${signup ? 'Criar conta' : 'Entrar'}</button>
+      <button type="submit" class="btn primary big">${signup ? 'Criar conta' : 'Entrar'}</button>
     </form>
-    <p class="muted">${signup ? 'Já tem conta? <a href="#/entrar">Entrar</a>' : 'Primeira vez? <a href="#/criar-conta">Criar conta</a>'}</p>`);
+    <p class="muted switch">${signup ? 'Já tem conta? <a href="#/entrar">Entrar</a>' : 'Primeira vez? <a href="#/criar-conta">Criar conta</a>'}</p>
+    </div>`);
   const form = $('#f-auth', el);
   if (signup) {
     const family = form.elements.family;
@@ -194,21 +280,27 @@ function login(signup) {
 async function myList() {
   const gifts = ok(await supabase.from('gifts').select('id, title, url, note, purchased').eq('owner_id', me.id).order('created_at'));
   const el = section(`
-    <div class="head">
-      <h2>Minha lista</h2>
-      <button class="btn primary" data-act="add">+ Adicionar</button>
+    <div class="feature">
+      <div class="feature-title">
+        <h2>Minha lista</h2>
+        <span class="chip">${gifts.length} ${gifts.length === 1 ? 'mimo' : 'mimos'}</span>
+      </div>
+      <p>Olá, ${esc(me.name)}! O que você quer ganhar neste Natal?</p>
+      <button class="btn dark" data-act="add">${ico('plus')} Adicionar presente</button>
     </div>
-    <p class="muted">Olá, ${esc(me.name)}! O que você quer ganhar neste Natal?</p>
     ${gifts.length ? `<ul class="list">${gifts.map((g) => `
-      <li class="card gift">
-        ${giftBody(g)}
-        ${g.purchased ? '<p class="seal">Alguém já comprou 🎉</p>' : ''}
+      <li class="item gift">
+        ${tile('gift')}
+        <div class="item-body">
+          ${giftBody(g)}
+          ${g.purchased ? '<p class="seal">Alguém já comprou 🎉</p>' : ''}
+        </div>
         <div class="actions">
           <button class="btn small" data-act="edit" data-id="${esc(g.id)}">Editar</button>
           <button class="btn small danger" data-act="del" data-id="${esc(g.id)}">Apagar</button>
         </div>
       </li>`).join('')}</ul>`
-    : '<p class="empty">Sua lista está vazia. Adicione o primeiro mimo! 🎁</p>'}`);
+    : emptyState('gift', 'Sua lista ainda está vazia', 'Comece pelo que você mais quer ganhar. Dá para colocar o link da loja e o tamanho.')}`);
   on(el, {
     add: () => giftDialog(),
     edit: (id) => giftDialog(gifts.find((g) => g.id === id)),
@@ -259,12 +351,13 @@ async function families() {
   const el = section(`
     <h2>Famílias</h2>
     ${fams.length ? `<ul class="list">${fams.map((f) => `
-      <li><a class="card row" href="#/familia/${esc(f.id)}">
-        <span>${esc(f.name)}</span>${f.owner_id === me.id ? '<span class="tag admin">Admin</span>' : ''}
+      <li><a class="item link-item" href="#/familia/${esc(f.id)}">
+        ${tile('home')}<span class="item-title">${esc(f.name)}</span>${f.owner_id === me.id ? '<span class="tag admin">Admin</span>' : '<span class="tag">Membro</span>'}
       </a></li>`).join('')}</ul>`
-    : '<p class="empty">Você ainda não está em nenhuma família. Crie uma ou peça um link de convite!</p>'}
+    : emptyState('users', 'Você ainda não está em nenhuma família', 'Crie a sua aqui embaixo ou peça para o admin da sua família adicionar seu e-mail.')}
     <form id="f-fam" class="card stack">
-      <h3>Criar família</h3>
+      <h3>Criar uma família</h3>
+      <p class="muted small">Você vira o admin e pode adicionar as pessoas pelo e-mail.</p>
       <label>Nome da família
         <input name="name" required maxlength="80" pattern=".*\\S.*" placeholder="Ex.: Família Silva">
       </label>
@@ -292,20 +385,24 @@ async function family(id) {
   const el = section(`
     <a class="back" href="#/familias">← Famílias</a>
     <h2>${esc(fam.name)}</h2>
-    <h3>Membros</h3>
-    <ul class="list">${members.map((m) => `
-      <li class="card row">
-        <a href="${m.user_id === me.id ? '#/' : '#/pessoa/' + esc(m.user_id)}">${esc(nameOf(m))}${m.user_id === me.id ? ' (você)' : ''}</a>
-        ${m.user_id === fam.owner_id ? '<span class="tag admin">Admin</span>'
-          : owner ? `<button class="btn small danger" data-act="remove" data-id="${esc(m.user_id)}">Remover</button>` : ''}
-      </li>`).join('')}</ul>
+    <div class="panel">
+      <h3>Membros <span class="chip">${members.length}</span></h3>
+      <ul class="list">${members.map((m) => `
+        <li class="item member">
+          <span class="tile initial" aria-hidden="true">${initial(nameOf(m))}</span>
+          <a class="item-title" href="${m.user_id === me.id ? '#/' : '#/pessoa/' + esc(m.user_id)}">${esc(nameOf(m))}${m.user_id === me.id ? ' (você)' : ''}</a>
+          ${m.user_id === fam.owner_id ? '<span class="tag admin">Admin</span>'
+            : `<span class="tag">Membro</span>${owner ? `<button class="btn small danger" data-act="remove" data-id="${esc(m.user_id)}">Remover</button>` : ''}`}
+        </li>`).join('')}</ul>
+    </div>
     ${owner ? `
-      ${invites.length ? `<h3>Aguardando criar conta</h3>
+      ${invites.length ? `<h3>Aguardando criar conta <span class="chip">${invites.length}</span></h3>
       <ul class="list">${invites.map((i) => `
-        <li class="card row"><span>${esc(i.email)}</span>
+        <li class="item">${tile('mail')}<span class="item-title">${esc(i.email)}</span>
           <button class="btn small danger" data-act="uninvite" data-id="${esc(i.email)}">Cancelar</button></li>`).join('')}</ul>` : ''}
       <form id="f-add" class="card stack">
         <h3>Adicionar membro</h3>
+        <p class="muted small">Se a pessoa já tem conta, entra na hora. Se não, entra assim que criar a conta com este e-mail.</p>
         <label>E-mail da pessoa
           <input name="email" type="email" required autocomplete="off" inputmode="email">
         </label>
@@ -321,8 +418,8 @@ async function family(id) {
           ${navigator.share ? '<button class="btn primary" data-act="share">Compartilhar</button>' : ''}
         </div>
       </div>
-      <p><button class="btn danger" data-act="destroy">Apagar família</button></p>`
-    : '<p><button class="btn danger" data-act="leave">Sair da família</button></p>'}`);
+      <p class="end"><button class="btn danger" data-act="destroy">Apagar família</button></p>`
+    : '<p class="end"><button class="btn danger" data-act="leave">Sair da família</button></p>'}`);
 
   const addForm = $('#f-add', el);
   if (addForm) addForm.onsubmit = submit(addForm, async (f) => {
@@ -388,20 +485,25 @@ async function person(id) {
 
   const status = (g) => {
     const b = buyOf[g.id];
-    if (!b && !g.purchased) return `<button class="btn primary" data-act="buy" data-id="${esc(g.id)}">Comprei este</button>`;
+    if (!b && !g.purchased) return `<button class="btn primary" data-act="buy" data-id="${esc(g.id)}">${ico('check')} Comprei este</button>`;
     if (b?.buyer_id === me.id) return `<span class="seal">Você comprou ✔</span><button class="btn small" data-act="undo" data-id="${esc(g.id)}">Desfazer</button>`;
     return `<span class="seal">Já comprado por ${esc(b?.profiles?.name ?? 'alguém')}</span>`;
   };
 
   const el = section(`
     <a class="back" href="#/familias">← Famílias</a>
-    <h2>Lista de ${esc(p.name)}</h2>
+    <div class="feature-title">
+      <h2>Lista de ${esc(p.name)}</h2>
+      <span class="chip">${gifts.length} ${gifts.length === 1 ? 'mimo' : 'mimos'}</span>
+    </div>
+    <p class="muted">Escolha um presente e marque “Comprei este”. ${esc(p.name)} só fica sabendo que alguém comprou, não quem.</p>
     ${gifts.length ? `<ul class="list">${gifts.map((g) => `
-      <li class="card gift${g.purchased ? ' bought' : ''}">
-        ${giftBody(g)}
+      <li class="item gift${g.purchased ? ' bought' : ''}">
+        ${tile(g.purchased ? 'check' : 'gift')}
+        <div class="item-body">${giftBody(g)}</div>
         <div class="actions">${status(g)}</div>
       </li>`).join('')}</ul>`
-    : '<p class="empty">Nenhum presente na lista ainda.</p>'}`);
+    : emptyState('gift', 'Nenhum presente na lista ainda', `Quando ${esc(p.name)} adicionar um mimo, você recebe um alerta.`)}`);
 
   on(el, {
     buy: async (gid) => {
@@ -429,12 +531,15 @@ async function alerts() {
       ${list.some((n) => !n.read_at) ? '<button class="btn small" data-act="all">Marcar todas como lidas</button>' : ''}
     </div>
     ${list.length ? `<ul class="list">${list.map((n) => `
-      <li><button class="card alert${n.read_at ? '' : ' unread'}" data-act="open" data-id="${esc(n.id)}">
-        <strong>${esc(n.title)}</strong>
-        <span>${esc(n.body)}</span>
-        <small>${fmtDate(n.created_at)}${n.read_at ? '' : ' · nova'}</small>
+      <li><button class="item alert${n.read_at ? '' : ' unread'}" data-act="open" data-id="${esc(n.id)}">
+        ${tile('bell')}
+        <span class="item-body">
+          <strong>${esc(n.title)}</strong>
+          <span>${esc(n.body)}</span>
+          <small>${fmtDate(n.created_at)}${n.read_at ? '' : ' <span class="chip">nova</span>'}</small>
+        </span>
       </button></li>`).join('')}</ul>`
-    : '<p class="empty">Nenhum alerta por enquanto. 🔔</p>'}`);
+    : emptyState('bell', 'Nenhum alerta por enquanto', 'Quando alguém da família adicionar um presente ou comprar um mimo seu, o aviso aparece aqui.')}`);
   on(el, {
     open: async (id) => {
       const n = list.find((x) => String(x.id) === id);
@@ -470,6 +575,10 @@ async function pushBox(box) {
 async function profile() {
   const el = section(`
     <h2>Perfil</h2>
+    <div class="panel profile-head">
+      <span class="tile initial big" aria-hidden="true">${initial(me.name)}</span>
+      <div><span>Conectado como</span><strong>${esc(user.email)}</strong></div>
+    </div>
     <form id="f-name" class="card stack">
       <label>Seu nome
         <input name="name" required maxlength="60" pattern=".*\\S.*" autocomplete="name" value="${esc(me.name)}">
@@ -480,8 +589,7 @@ async function profile() {
       <h3>Notificações</h3>
       <div id="push" class="stack"></div>
     </div>
-    <p class="muted">Conectado como ${esc(user.email)}</p>
-    <button class="btn danger" data-act="logout">Sair</button>`);
+    <p class="end"><button class="btn danger" data-act="logout">Sair da conta</button></p>`);
   const box = $('#push', el);
   await pushBox(box);
 
