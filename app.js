@@ -20,17 +20,12 @@ function validUrl(u) {
   try { new URL(u); return /^https?:\/\//i.test(u); } catch { return false; }
 }
 
-function store(key, value) {
-  try { value == null ? localStorage.removeItem(key) : localStorage.setItem(key, value); } catch { /* private mode */ }
-}
-function load(key) {
-  try { return localStorage.getItem(key); } catch { return null; }
-}
-
 function friendly(err) {
   const msg = err?.message ?? String(err);
   if (err?.status === 429 || /rate limit|too many|security purposes/i.test(msg)) return 'Muitas tentativas seguidas. Espere alguns minutos e tente de novo.';
-  if (/expired|invalid/i.test(msg) && /otp|token|code/i.test(msg)) return 'Código inválido ou expirado. Confira o e-mail ou peça um novo.';
+  if (/invalid login credentials/i.test(msg)) return 'E-mail ou senha incorretos.';
+  if (/already registered/i.test(msg)) return 'Este e-mail já tem conta. Use "Entrar".';
+  if (/password should be/i.test(msg)) return 'A senha precisa ter pelo menos 6 caracteres.';
   if (/duplicate key/i.test(msg)) return 'Alguém acabou de comprar este presente.';
   if (/failed to fetch|network/i.test(msg)) return 'Sem conexão. Verifique a internet.';
   return msg;
@@ -102,11 +97,9 @@ const routes = [
 async function render(focus = false) {
   const token = ++seq;
   const hash = location.hash;
-  const invite = hash.match(/^#\/entrar\/([\w-]+)$/);
-  if (invite) store('mimo_invite', invite[1]);
   nav.hidden = !user;
-  if (!user) return show(login(), focus);
-  if (invite) return joinPending();
+  if (!user) return show(login(hash === '#/criar-conta'), focus);
+  if (hash === '#/criar-conta') return go('#/');
 
   const route = routes.find(([re]) => re.test(hash));
   if (!route) return go('#/');
@@ -132,18 +125,6 @@ function show(el, focus) {
   if (focus) view.focus();
 }
 
-async function joinPending() {
-  const code = load('mimo_invite');
-  store('mimo_invite', null);
-  const { data, error } = await supabase.rpc('join_family', { code });
-  if (error) {
-    toast(friendly(error));
-    return go('#/familias');
-  }
-  toast('Você entrou na família! 🎄');
-  go('#/familia/' + data);
-}
-
 async function updateBadge() {
   const { count } = await supabase.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null);
   const badge = $('#badge');
@@ -154,58 +135,30 @@ async function updateBadge() {
 
 // ---------- views ----------
 
-function login() {
-  let email = load('mimo_email');
+function login(signup) {
   const el = section(`
-    <h2>Entrar</h2>
-    ${load('mimo_invite') ? '<p class="banner">🎄 Você foi convidado para uma família! Entre para aceitar o convite.</p>' : ''}
-    <form id="f-email" class="card stack" ${email ? 'hidden' : ''}>
-      <p class="muted">Enviaremos um código para o seu e-mail. Sem senha.</p>
-      <label>Seu nome
+    <h2>${signup ? 'Criar conta' : 'Entrar'}</h2>
+    ${signup ? '<p class="banner">🎄 Use o mesmo e-mail que a sua família cadastrou: você já entra nela.</p>' : ''}
+    <form id="f-auth" class="card stack">
+      ${signup ? `<label>Seu nome
         <input name="name" required maxlength="60" pattern=".*\\S.*" autocomplete="name">
-      </label>
+      </label>` : ''}
       <label>E-mail
         <input name="email" type="email" required autocomplete="email" inputmode="email">
       </label>
-      <button type="submit" class="btn primary">Enviar código</button>
-    </form>
-    <form id="f-code" class="card stack" ${email ? '' : 'hidden'}>
-      <p><strong>Verifique seu e-mail!</strong> Enviamos um acesso para <strong id="sent-to">${esc(email)}</strong>.
-        Toque no link do e-mail <strong>neste mesmo navegador</strong> ou, se vier um código, digite abaixo.</p>
-      <label>Código (se o e-mail trouxer)
-        <input name="token" required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" maxlength="10">
+      <label>Senha
+        <input name="password" type="password" required minlength="6" autocomplete="${signup ? 'new-password' : 'current-password'}">
       </label>
-      <button type="submit" class="btn primary">Entrar</button>
-      <button type="button" class="btn link" data-act="back">Usar outro e-mail</button>
-    </form>`);
-  const fEmail = $('#f-email', el);
-  const fCode = $('#f-code', el);
-
-  fEmail.onsubmit = submit(fEmail, async (f) => {
-    email = f.email.trim();
-    ok(await supabase.auth.signInWithOtp({
-      email,
-      options: { data: { name: f.name.trim() }, emailRedirectTo: location.origin + location.pathname },
-    }));
-    store('mimo_email', email);
-    $('#sent-to', el).textContent = email;
-    fEmail.hidden = true;
-    fCode.hidden = false;
-    fCode.elements.token.focus();
-  });
-
+      <button type="submit" class="btn primary">${signup ? 'Criar conta' : 'Entrar'}</button>
+    </form>
+    <p class="muted">${signup ? 'Já tem conta? <a href="#/">Entrar</a>' : 'Primeira vez? <a href="#/criar-conta">Criar conta</a>'}</p>`);
+  const form = $('#f-auth', el);
   // Success fires onAuthStateChange, which renders the app.
-  fCode.onsubmit = submit(fCode, async (f) => {
-    ok(await supabase.auth.verifyOtp({ email, token: f.token.trim(), type: 'email' }));
-  });
-
-  on(el, {
-    back: () => {
-      store('mimo_email', null);
-      fCode.hidden = true;
-      fEmail.hidden = false;
-      fEmail.elements.email.focus();
-    },
+  form.onsubmit = submit(form, async (f) => {
+    const email = f.email.trim();
+    if (!signup) return ok(await supabase.auth.signInWithPassword({ email, password: f.password }));
+    const data = ok(await supabase.auth.signUp({ email, password: f.password, options: { data: { name: f.name.trim() } } }));
+    if (!data.session) toast('Conta criada! Confirme pelo link no seu e-mail e depois entre.');
   });
   return el;
 }
@@ -298,13 +251,14 @@ async function families() {
 }
 
 async function family(id) {
-  const [fam, members] = await Promise.all([
-    supabase.from('families').select('id, name, owner_id, invite_code').eq('id', id).maybeSingle().then(ok),
+  const [fam, members, invites] = await Promise.all([
+    supabase.from('families').select('id, name, owner_id').eq('id', id).maybeSingle().then(ok),
     supabase.from('family_members').select('user_id, joined_at, profiles(name)').eq('family_id', id).order('joined_at').then(ok),
+    supabase.from('family_invites').select('email').eq('family_id', id).order('created_at').then(ok),
   ]);
   if (!fam) return section('<a class="back" href="#/familias">← Famílias</a><p class="empty">Família não encontrada.</p>');
   const owner = fam.owner_id === me.id;
-  const link = location.origin + location.pathname + '#/entrar/' + fam.invite_code;
+  const link = location.origin + location.pathname + '#/criar-conta';
   const nameOf = (m) => m.profiles?.name ?? 'Alguém';
 
   const el = section(`
@@ -318,9 +272,20 @@ async function family(id) {
           : owner ? `<button class="btn small danger" data-act="remove" data-id="${esc(m.user_id)}">Remover</button>` : ''}
       </li>`).join('')}</ul>
     ${owner ? `
+      ${invites.length ? `<h3>Aguardando criar conta</h3>
+      <ul class="list">${invites.map((i) => `
+        <li class="card row"><span>${esc(i.email)}</span>
+          <button class="btn small danger" data-act="uninvite" data-id="${esc(i.email)}">Cancelar</button></li>`).join('')}</ul>` : ''}
+      <form id="f-add" class="card stack">
+        <h3>Adicionar membro</h3>
+        <label>E-mail da pessoa
+          <input name="email" type="email" required autocomplete="off" inputmode="email">
+        </label>
+        <button type="submit" class="btn primary">Adicionar</button>
+      </form>
       <div class="card stack">
-        <h3>Convidar</h3>
-        <label>Mande este link para a família
+        <h3>Quem ainda não tem conta</h3>
+        <label>Mande este link para criar a conta com o e-mail que você adicionou
           <input id="invite" readonly value="${esc(link)}">
         </label>
         <div class="actions">
@@ -331,7 +296,18 @@ async function family(id) {
       <p><button class="btn danger" data-act="destroy">Apagar família</button></p>`
     : '<p><button class="btn danger" data-act="leave">Sair da família</button></p>'}`);
 
+  const addForm = $('#f-add', el);
+  if (addForm) addForm.onsubmit = submit(addForm, async (f) => {
+    const result = ok(await supabase.rpc('add_member', { fam: id, member_email: f.email }));
+    toast(result === 'added' ? 'Membro adicionado! 🎄' : 'Pronto! Quando criar a conta com esse e-mail, já entra na família.');
+    render();
+  });
+
   on(el, {
+    uninvite: async (email) => {
+      ok(await supabase.from('family_invites').delete().eq('family_id', id).eq('email', email));
+      render();
+    },
     remove: async (uid) => {
       if (!confirm(`Remover ${nameOf(members.find((m) => m.user_id === uid))} da família?`)) return;
       ok(await supabase.from('family_members').delete().eq('family_id', id).eq('user_id', uid));
@@ -348,7 +324,7 @@ async function family(id) {
     },
     share: async () => {
       try {
-        await navigator.share({ title: 'Me Dá Mimo', text: `Entre na família "${fam.name}" no Me Dá Mimo 🎄`, url: link });
+        await navigator.share({ title: 'Me Dá Mimo', text: `Crie sua conta no Me Dá Mimo para entrar na família "${fam.name}" 🎄`, url: link });
       } catch (e) {
         if (e.name !== 'AbortError') throw e;
       }
@@ -512,8 +488,6 @@ async function start() {
   if (user) {
     const { data } = await supabase.from('profiles').select('id, name').eq('id', user.id).maybeSingle();
     me = data ?? { id: user.id, name: user.user_metadata?.name ?? '' };
-    store('mimo_email', null);
-    if (load('mimo_invite')) return joinPending();
   }
   render(true);
 }
