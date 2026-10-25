@@ -1,72 +1,83 @@
-# Me Dá Mimo 🎁
+<p align="center">
+  <img src="icons/logo.png" alt="Logo do Me Dá Mimo: caixa de presente com laço dourado" width="120">
+</p>
 
-Lista de presentes de Natal em família — sem presente repetido e sem estragar a surpresa.
+<h1 align="center">Me Dá Mimo</h1>
 
-**No ar:** https://dheph.github.io/me-da-mimo/
+<p align="center">
+  Lista de presentes de Natal em família: sem presente repetido e sem estragar a surpresa.<br>
+  <a href="https://dheph.github.io/me-da-mimo/"><strong>Abrir o app →</strong></a>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/inicio-publico.jpg" alt="Página inicial" width="200">
+  <img src="docs/screenshots/painel.jpg" alt="Painel com o botão Adicionar meu pedido" width="200">
+  <img src="docs/screenshots/presentes-para-dar.jpg" alt="Presentes para dar, com filtros e busca" width="200">
+</p>
 
 ## Como funciona
 
-1. **O admin cria a conta e a família** (em "Criar conta" → *Admin da família*).
-2. **O admin adiciona as pessoas pelo e-mail.** Quem já tem conta entra na hora; quem não tem entra
-   automaticamente ao criar a conta com aquele e-mail (link `#/criar-conta`, opção *Membro da família*).
-3. **Cada um monta a própria lista**, com link da loja e observação. O admin também é membro e tem lista.
-4. **A família recebe um alerta** quando alguém adiciona um presente.
-5. **Quem compra toca em "Comprei este".** O presenteado recebe o aviso de que alguém comprou, mas
-   nunca vê quem foi. Os outros membros veem, para não comprar repetido.
+1. **Quem organiza cria a família.** Em "Criar conta", escolha *Admin da família* e dê um nome a ela.
+2. **O admin adiciona as pessoas pelo e-mail.** Quem já tem conta entra na hora. Quem ainda não tem
+   entra sozinho ao criar a conta com aquele e-mail, escolhendo *Membro da família*.
+3. **Cada um faz os seus pedidos.** Toque em **Adicionar meu pedido** e diga o que quer ganhar, com o
+   link da loja e detalhes como tamanho e cor.
+4. **A família fica sabendo.** Todo pedido novo gera um aviso para os outros membros.
+5. **Comprou? Marque "Comprei este".** O presente sai da lista de quem vai dar. Quem vai ganhar recebe
+   o aviso de que alguém comprou, mas nunca sabe quem foi.
 
-Funciona como app no celular (PWA): "Adicionar à Tela de Início". No iPhone, as notificações push só
-funcionam com o app instalado assim (iOS 16.4+).
+Tudo fica numa tela só: o botão de pedir, a sua família, os **presentes para dar** (com busca, filtro
+por pessoa e "que eu comprei") e os **seus pedidos**.
 
-## Perfis
+<p align="center">
+  <img src="docs/screenshots/criar-conta.jpg" alt="Criar conta escolhendo Admin ou Membro" width="200">
+  <img src="docs/screenshots/instalar.jpg" alt="Passo a passo para instalar no celular" width="200">
+</p>
+
+## Admin e membros
 
 | | Admin | Membro |
-|---|---|---|
-| Tem a própria lista e compra presentes | ✅ | ✅ |
-| Adiciona e remove membros, apaga a família | ✅ | — |
-| Sai da família | — (apaga a família) | ✅ |
+|---|:---:|:---:|
+| Faz os próprios pedidos e compra presentes | ✅ | ✅ |
+| Adiciona e remove pessoas da família | ✅ | — |
+| Sai da família | — | ✅ |
 
-"Admin" é quem criou a família; uma pessoa pode ser admin de uma família e membro de outra.
+O admin também é membro: tem a própria lista e ganha presente como todo mundo. A mesma pessoa pode
+ser admin de uma família e membro de outra.
 
-## Stack
+## Instalar no celular
 
-Site estático, sem build, no GitHub Pages + Supabase (Postgres, Auth, Edge Functions).
+O Me Dá Mimo funciona no navegador, mas **instalado** ele vira um ícone na tela e manda os avisos. O
+próprio app mostra o passo a passo certo para o seu aparelho e lembra você até instalar.
 
-| Arquivo | Papel |
-|---|---|
-| `index.html`, `app.js`, `style.css` | App (rotas por hash, telas) |
-| `supabase.js`, `config.js` | Cliente Supabase (URL + anon key, públicas) |
-| `push.js`, `sw.js`, `manifest.webmanifest`, `icons/` | PWA e Web Push |
-| `supabase/migrations/` | Schema, RLS e triggers (aplicar em ordem) |
-| `supabase/functions/push/` | Edge function que envia o push (chaves VAPID no Vault) |
+- **Android (Chrome):** toque em **Instalar agora** no app. Se o botão não aparecer, use o menu ⋮ →
+  *Instalar app*.
+- **iPhone (Safari):** toque em **Compartilhar** → **Adicionar à Tela de Início** → **Adicionar**.
+  Depois abra pelo ícone novo. No iPhone os avisos só funcionam assim (iOS 16.4 ou mais novo).
+- **Abriu pelo WhatsApp ou Instagram?** Toque nos três pontinhos e escolha *Abrir no navegador*.
 
-Toda regra de acesso está no banco (RLS + funções `security definer`): o frontend só usa a anon key.
+Depois de instalado, o app pede para **ativar os avisos**: é assim que você fica sabendo dos pedidos
+da família e das compras dos seus presentes.
 
-## Rodar local
+## Para desenvolver
+
+É um site estático, sem etapa de build: HTML, CSS e JavaScript puros. Ele é publicado no GitHub Pages
+e funciona como PWA (instalável e com notificações push).
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Abra http://localhost:8000. O app fala direto com o Supabase de produção.
+Depois abra http://localhost:8000.
 
-## Configuração do Supabase (já feita)
+| Pasta / arquivo | O que tem |
+|---|---|
+| `index.html`, `app.js`, `style.css` | Telas e navegação |
+| `install.js`, `push.js`, `sw.js`, `manifest.webmanifest` | Instalação, avisos e modo app |
+| `icons/` | Logo e ícones do app |
+| `supabase/` | Banco de dados e função de envio dos avisos |
+| `docs/screenshots/` | Imagens deste README |
 
-- Authentication → URL Configuration: Site URL `https://dheph.github.io/me-da-mimo/`, Redirect `https://dheph.github.io/me-da-mimo/**`.
-- Authentication → Sign In / Providers → Email: **Confirm email desligado** (a v1 não envia e-mail).
-  Para religar, configure antes um SMTP próprio — o padrão do Supabase envia poucos e-mails por hora.
+---
 
-## Segurança
-
-- Nunca versione `service_role`, `sb_secret_…`, `.env` ou chaves privadas. A anon key em `config.js` é pública por design.
-- Ative o hook que bloqueia segredos em commits (uma vez por clone):
-
-  ```bash
-  git config core.hooksPath .githooks
-  ```
-
-## Limitações conhecidas (v1)
-
-- Sem confirmação de e-mail: quem se cadastrar com o e-mail de outra pessoa entra na família dela.
-- Sem "Esqueci a senha" no app — redefinir pelo Dashboard do Supabase (Authentication → Users).
-
-© 2026 Me Dá Mimo
+<p align="center">© 2026 Me Dá Mimo · Feito com carinho para o Natal em família</p>
