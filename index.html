@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Me Dá Mimo</title>
+  <meta name="description" content="Lista de presentes de Natal da família.">
+  <meta name="theme-color" content="#C8102E">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Me Dá Mimo">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <img src="icons/logo.png" alt="" width="36" height="36">
+    <h1>Me Dá Mimo</h1>
+  </header>
+
+  <main id="view" tabindex="-1">
+    <p class="empty">Carregando…</p>
+    <noscript><p class="empty">Ative o JavaScript para usar o Me Dá Mimo.</p></noscript>
+  </main>
+
+  <nav id="nav" class="tabs" aria-label="Navegação principal" hidden>
+    <a href="#/" data-tab="home"><span class="ico" aria-hidden="true">🎁</span>Minha lista</a>
+    <a href="#/familias" data-tab="familias"><span class="ico" aria-hidden="true">👪</span>Famílias</a>
+    <a href="#/alertas" data-tab="alertas" id="nav-alerts"><span class="ico" aria-hidden="true">🔔</span>Alertas<span id="badge" class="badge" aria-hidden="true" hidden></span></a>
+    <a href="#/perfil" data-tab="perfil"><span class="ico" aria-hidden="true">👤</span>Perfil</a>
+  </nav>
+
+  <dialog id="gift-dialog" aria-labelledby="gift-dialog-title">
+    <form id="gift-form" class="stack" novalidate>
+      <h2 id="gift-dialog-title">Novo presente</h2>
+      <label>O que você quer?
+        <input name="title" required maxlength="120" autocomplete="off">
+      </label>
+      <label>Link (opcional)
+        <input name="url" type="url" inputmode="url" placeholder="https://…" autocomplete="off">
+      </label>
+      <label>Observação (opcional)
+        <textarea name="note" maxlength="500" rows="3" placeholder="Tamanho, cor, modelo…"></textarea>
+      </label>
+      <p id="gift-error" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" class="btn" id="gift-cancel">Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
