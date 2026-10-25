@@ -546,3 +546,15 @@ dialog .actions { justify-content: flex-end; }
 }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* home dashboard */
+.hello { font-size: 1.25rem; font-weight: 700; color: var(--plum); margin: 0 0 .75rem; }
+.block { margin-top: 2rem; }
+.block .head { margin-bottom: .35rem; }
+.block > .muted { margin: 0 0 .9rem; }
+.block .empty { padding: 1.5rem 1rem; }
+.people { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.item-title small { display: block; font-weight: 500; color: var(--muted); font-size: .875rem; }
+.for { display: inline-block; font-size: .8125rem; font-weight: 700; color: var(--pine); text-transform: uppercase; letter-spacing: .04em; margin-bottom: .1rem; }
+.feature .btn.big { width: 100%; }
+@media (min-width: 560px) { .feature .btn.big { width: auto; } }

@@ -107,7 +107,7 @@ const emptyState = (icon, title, text) => `<div class="empty">${tile(icon, ' big
 // ---------- router ----------
 
 const routes = [
-  [/^(#\/?)?$/, myList, 'home'],
+  [/^(#\/?)?$/, home, 'home'],
   [/^#\/familias$/, families, 'familias'],
   [/^#\/familia\/([0-9a-f-]{36})$/, family, 'familias'],
   [/^#\/pessoa\/([0-9a-f-]{36})$/, person, 'familias'],
@@ -277,36 +277,109 @@ function login(signup) {
   return el;
 }
 
-async function myList() {
-  const gifts = ok(await supabase.from('gifts').select('id, title, url, note, purchased').eq('owner_id', me.id).order('created_at'));
+// Purchases are only visible on other people's gifts (the owner never sees the buyer).
+async function purchasesOf(gifts) {
+  if (!gifts.length) return {};
+  const buys = ok(await supabase.from('purchases').select('gift_id, buyer_id, profiles(name)').in('gift_id', gifts.map((g) => g.id)));
+  return Object.fromEntries(buys.map((b) => [b.gift_id, b]));
+}
+
+function buyStatus(g, buyOf) {
+  const b = buyOf[g.id];
+  if (!b && !g.purchased) return `<button class="btn primary" data-act="buy" data-id="${esc(g.id)}">${ico('check')} Comprei este</button>`;
+  if (b?.buyer_id === me.id) return `<span class="seal">Você comprou ✔</span><button class="btn small" data-act="undo" data-id="${esc(g.id)}">Desfazer</button>`;
+  return `<span class="seal">Já comprado por ${esc(b?.profiles?.name ?? 'alguém')}</span>`;
+}
+
+const buyActions = {
+  buy: async (gid) => {
+    const { error } = await supabase.from('purchases').insert({ gift_id: gid });
+    render();
+    if (error) throw error;
+    toast('Anotado! O segredo está guardado 🤫');
+  },
+  undo: async (gid) => {
+    ok(await supabase.from('purchases').delete().eq('gift_id', gid));
+    render();
+  },
+};
+
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+// Everything on one screen: add my wish, my family, what I can buy, my wishes.
+async function home() {
+  const [gifts, people, fams] = await Promise.all([
+    supabase.from('gifts').select('id, title, url, note, purchased, owner_id, profiles(name)').order('created_at').then(ok),
+    supabase.from('profiles').select('id, name').neq('id', me.id).order('name').then(ok),
+    supabase.from('families').select('id, owner_id').order('created_at').then(ok),
+  ]);
+  const mine = gifts.filter((g) => g.owner_id === me.id);
+  const others = gifts.filter((g) => g.owner_id !== me.id);
+  const buyOf = await purchasesOf(others);
+  // Hide what someone else already bought: this list is "what can I still give?".
+  const toGive = others.filter((g) => !g.purchased || buyOf[g.id]?.buyer_id === me.id);
+  const wishesOf = (id) => others.filter((g) => g.owner_id === id).length;
+  const myFam = fams.find((f) => f.owner_id === me.id);
+  const addPeople = myFam ? `<a class="btn small" href="#/familia/${esc(myFam.id)}">${ico('plus')} Adicionar pessoa</a>` : '';
+
   const el = section(`
+    <p class="hello">Oi, ${esc(me.name)}! 🎄</p>
     <div class="feature">
-      <div class="feature-title">
-        <h2>Minha lista</h2>
-        <span class="chip">${gifts.length} ${gifts.length === 1 ? 'mimo' : 'mimos'}</span>
-      </div>
-      <p>Olá, ${esc(me.name)}! O que você quer ganhar neste Natal?</p>
-      <button class="btn dark" data-act="add">${ico('plus')} Adicionar presente</button>
+      <h2>O que você quer ganhar?</h2>
+      <p>Conte para a família. Dá para colocar o link da loja, o tamanho e a cor.</p>
+      <button class="btn dark big" data-act="add">${ico('plus')} Adicionar meu pedido</button>
     </div>
-    ${gifts.length ? `<ul class="list">${gifts.map((g) => `
-      <li class="item gift">
-        ${tile('gift')}
-        <div class="item-body">
-          ${giftBody(g)}
-          ${g.purchased ? '<p class="seal">Alguém já comprou 🎉</p>' : ''}
-        </div>
-        <div class="actions">
-          <button class="btn small" data-act="edit" data-id="${esc(g.id)}">Editar</button>
-          <button class="btn small danger" data-act="del" data-id="${esc(g.id)}">Apagar</button>
-        </div>
-      </li>`).join('')}</ul>`
-    : emptyState('gift', 'Sua lista ainda está vazia', 'Comece pelo que você mais quer ganhar. Dá para colocar o link da loja e o tamanho.')}`);
+
+    <section class="block" aria-labelledby="h-fam">
+      <div class="head"><h2 id="h-fam">Minha família</h2>${addPeople}</div>
+      ${people.length ? `<p class="muted">Toque numa pessoa para ver os pedidos dela.</p>
+      <ul class="list people">${people.map((p) => `
+        <li><a class="item link-item" href="#/pessoa/${esc(p.id)}">
+          <span class="tile initial" aria-hidden="true">${initial(p.name)}</span>
+          <span class="item-title">${esc(p.name)}<small>${plural(wishesOf(p.id), 'pedido', 'pedidos')}</small></span>
+        </a></li>`).join('')}</ul>`
+      : emptyState('users', 'Sua família ainda está vazia', myFam
+        ? 'Toque em “Adicionar pessoa” e coloque o e-mail de cada um.'
+        : 'Peça para quem organiza a família adicionar o seu e-mail.')}
+    </section>
+
+    <section class="block" aria-labelledby="h-give">
+      <div class="head"><h2 id="h-give">Presentes para dar</h2><span class="chip">${toGive.length}</span></div>
+      ${toGive.length ? `<p class="muted">Comprou algum? Toque em “Comprei este”. Quem vai ganhar não fica sabendo que foi você.</p>
+      <ul class="list">${toGive.map((g) => `
+        <li class="item gift">
+          <span class="tile initial" aria-hidden="true">${initial(g.profiles?.name)}</span>
+          <div class="item-body"><span class="for">Para ${esc(g.profiles?.name ?? 'alguém')}</span>${giftBody(g)}</div>
+          <div class="actions">${buyStatus(g, buyOf)}</div>
+        </li>`).join('')}</ul>`
+      : emptyState('gift', others.length ? 'Tudo já foi comprado! 🎉' : 'Ninguém fez pedido ainda', others.length
+        ? 'Quando alguém pedir algo novo, aparece aqui.'
+        : 'Quando alguém da família fizer um pedido, ele aparece aqui.')}
+    </section>
+
+    <section class="block" aria-labelledby="h-mine">
+      <div class="head"><h2 id="h-mine">Meus pedidos</h2><span class="chip">${mine.length}</span></div>
+      ${mine.length ? `<ul class="list">${mine.map((g) => `
+        <li class="item gift">
+          ${tile('gift')}
+          <div class="item-body">
+            ${giftBody(g)}
+            ${g.purchased ? '<p class="seal">Alguém já comprou 🎉</p>' : ''}
+          </div>
+          <div class="actions">
+            <button class="btn small" data-act="edit" data-id="${esc(g.id)}">Editar</button>
+            <button class="btn small danger" data-act="del" data-id="${esc(g.id)}">Apagar</button>
+          </div>
+        </li>`).join('')}</ul>`
+      : emptyState('gift', 'Você ainda não pediu nada', 'Toque em “Adicionar meu pedido” lá em cima.')}
+    </section>`);
   on(el, {
+    ...buyActions,
     add: () => giftDialog(),
-    edit: (id) => giftDialog(gifts.find((g) => g.id === id)),
+    edit: (id) => giftDialog(mine.find((g) => g.id === id)),
     del: async (id) => {
-      const g = gifts.find((x) => x.id === id);
-      if (!confirm(`Apagar "${g.title}" da sua lista?`)) return;
+      const g = mine.find((x) => x.id === id);
+      if (!confirm(`Apagar o pedido "${g.title}"?`)) return;
       ok(await supabase.from('gifts').delete().eq('id', id));
       render();
     },
@@ -318,7 +391,7 @@ function giftDialog(gift) {
   const dlg = $('#gift-dialog');
   const form = $('#gift-form');
   const error = $('#gift-error');
-  $('#gift-dialog-title').textContent = gift ? 'Editar presente' : 'Novo presente';
+  $('#gift-dialog-title').textContent = gift ? 'Editar meu pedido' : 'Novo pedido';
   for (const k of ['title', 'url', 'note']) form.elements[k].value = gift?.[k] ?? '';
   error.textContent = '';
   // Errors show inside the dialog: the toast sits under the modal's top layer.
@@ -327,13 +400,13 @@ function giftDialog(gift) {
     const btn = form.querySelector('[type=submit]');
     const f = Object.fromEntries(new FormData(form));
     const row = { title: f.title.trim(), url: f.url.trim() || null, note: f.note.trim() || null };
-    if (!row.title) return (error.textContent = 'Dê um nome ao presente.');
+    if (!row.title) return (error.textContent = 'Escreva o que você quer ganhar.');
     if (row.url && !validUrl(row.url)) return (error.textContent = 'O link precisa ser um endereço começando com http:// ou https://');
     btn.disabled = true;
     try {
       ok(gift ? await supabase.from('gifts').update(row).eq('id', gift.id) : await supabase.from('gifts').insert(row));
       dlg.close();
-      toast(gift ? 'Presente atualizado!' : 'Presente adicionado! 🎁');
+      toast(gift ? 'Pedido atualizado!' : 'Pedido adicionado! A família vai ser avisada 🎁');
       render();
     } catch (err) {
       error.textContent = friendly(err);
@@ -349,7 +422,7 @@ $('#gift-cancel').onclick = () => $('#gift-dialog').close();
 async function families() {
   const fams = ok(await supabase.from('families').select('id, name, owner_id').order('created_at'));
   const el = section(`
-    <h2>Famílias</h2>
+    <h2>Família</h2>
     ${fams.length ? `<ul class="list">${fams.map((f) => `
       <li><a class="item link-item" href="#/familia/${esc(f.id)}">
         ${tile('home')}<span class="item-title">${esc(f.name)}</span>${f.owner_id === me.id ? '<span class="tag admin">Admin</span>' : '<span class="tag">Membro</span>'}
@@ -377,13 +450,13 @@ async function family(id) {
     supabase.from('family_members').select('user_id, joined_at, profiles(name)').eq('family_id', id).order('joined_at').then(ok),
     supabase.from('family_invites').select('email').eq('family_id', id).order('created_at').then(ok),
   ]);
-  if (!fam) return section('<a class="back" href="#/familias">← Famílias</a><p class="empty">Família não encontrada.</p>');
+  if (!fam) return section('<a class="back" href="#/familias">← Família</a><p class="empty">Família não encontrada.</p>');
   const owner = fam.owner_id === me.id;
   const link = location.origin + location.pathname + '#/criar-conta';
   const nameOf = (m) => m.profiles?.name ?? 'Alguém';
 
   const el = section(`
-    <a class="back" href="#/familias">← Famílias</a>
+    <a class="back" href="#/familias">← Família</a>
     <h2>${esc(fam.name)}</h2>
     <div class="panel">
       <h3>Membros <span class="chip">${members.length}</span></h3>
@@ -477,46 +550,25 @@ async function person(id) {
     supabase.from('profiles').select('name').eq('id', id).maybeSingle().then(ok),
     supabase.from('gifts').select('id, title, url, note, purchased').eq('owner_id', id).order('created_at').then(ok),
   ]);
-  if (!p) return section('<a class="back" href="#/familias">← Famílias</a><p class="empty">Pessoa não encontrada.</p>');
-  const buys = gifts.length
-    ? ok(await supabase.from('purchases').select('gift_id, buyer_id, profiles(name)').in('gift_id', gifts.map((g) => g.id)))
-    : [];
-  const buyOf = Object.fromEntries(buys.map((b) => [b.gift_id, b]));
-
-  const status = (g) => {
-    const b = buyOf[g.id];
-    if (!b && !g.purchased) return `<button class="btn primary" data-act="buy" data-id="${esc(g.id)}">${ico('check')} Comprei este</button>`;
-    if (b?.buyer_id === me.id) return `<span class="seal">Você comprou ✔</span><button class="btn small" data-act="undo" data-id="${esc(g.id)}">Desfazer</button>`;
-    return `<span class="seal">Já comprado por ${esc(b?.profiles?.name ?? 'alguém')}</span>`;
-  };
+  if (!p) return section('<a class="back" href="#/">← Início</a><p class="empty">Pessoa não encontrada.</p>');
+  const buyOf = await purchasesOf(gifts);
 
   const el = section(`
-    <a class="back" href="#/familias">← Famílias</a>
+    <a class="back" href="#/">← Início</a>
     <div class="feature-title">
-      <h2>Lista de ${esc(p.name)}</h2>
-      <span class="chip">${gifts.length} ${gifts.length === 1 ? 'mimo' : 'mimos'}</span>
+      <h2>Pedidos de ${esc(p.name)}</h2>
+      <span class="chip">${gifts.length}</span>
     </div>
     <p class="muted">Escolha um presente e marque “Comprei este”. ${esc(p.name)} só fica sabendo que alguém comprou, não quem.</p>
     ${gifts.length ? `<ul class="list">${gifts.map((g) => `
       <li class="item gift${g.purchased ? ' bought' : ''}">
         ${tile(g.purchased ? 'check' : 'gift')}
         <div class="item-body">${giftBody(g)}</div>
-        <div class="actions">${status(g)}</div>
+        <div class="actions">${buyStatus(g, buyOf)}</div>
       </li>`).join('')}</ul>`
-    : emptyState('gift', 'Nenhum presente na lista ainda', `Quando ${esc(p.name)} adicionar um mimo, você recebe um alerta.`)}`);
+    : emptyState('gift', 'Nenhum pedido ainda', `Quando ${esc(p.name)} pedir algo, você recebe um alerta.`)}`);
 
-  on(el, {
-    buy: async (gid) => {
-      const { error } = await supabase.from('purchases').insert({ gift_id: gid });
-      render();
-      if (error) throw error;
-      toast('Anotado! O segredo está guardado 🤫');
-    },
-    undo: async (gid) => {
-      ok(await supabase.from('purchases').delete().eq('gift_id', gid));
-      render();
-    },
-  });
+  on(el, buyActions);
   return el;
 }
 
