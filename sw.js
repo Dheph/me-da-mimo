@@ -1,5 +1,5 @@
 // Service worker: push + shell offline (network-first, só mesma origem).
-const CACHE = 'mimo-v2';
+const CACHE = 'mimo-v3';
 const SHELL = ['./', './index.html', './app.js', './style.css', './supabase.js', './push.js', './config.js',
   './manifest.webmanifest', './icons/icon-192.png'];
 
@@ -17,7 +17,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return; // supabase/esm.sh passam direto
   // no-cache: revalidate (cheap 304) so a deploy shows up now, not after GitHub Pages' 10-min max-age.
-  e.respondWith(fetch(req, { cache: 'no-cache' }).then((res) => {
+  // (by URL: a navigate-mode Request can't be re-created with options)
+  e.respondWith(fetch(req.url, { cache: 'no-cache' }).then((res) => {
     if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
     return res;
   }).catch(() => caches.match(req, { ignoreSearch: true })
