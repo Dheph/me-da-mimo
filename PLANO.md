@@ -263,5 +263,5 @@ Faltam cerca de 2 meses para o Natal. A meta é colocar o MVP no ar até o **fim
 | D2 | Surpresa | ✅ O dono do presente nunca sabe da compra. Os outros membros veem a trava. |
 | D3 | Entrada na família | ✅ Pelo código criado pelo adm (contas novas) ou por convite aceito (contas existentes). |
 | D4 | Backend | ✅ Supabase gratuito. |
-| D5 | Validade do código | Proposta: 7 dias, uso único, trava após 5 erros. |
-| D6 | Quem pode criar família | Proposta: qualquer pessoa, pela tela "Criar minha família". A alternativa é só você criar as famílias, com o cadastro fechado. |
+| D5 | Validade do código | ✅ 7 dias, uso único, trava após 5 erros (o adm renova). |
+| D6 | Quem pode criar família | ✅ Qualquer pessoa, pela tela "Criar minha família". |
