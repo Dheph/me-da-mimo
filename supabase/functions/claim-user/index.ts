@@ -17,7 +17,8 @@ Deno.serve(async (req) => {
     const u = String(username ?? '').trim().toLowerCase();
     if (String(password ?? '').length < 6) return reply({ error: 'A senha precisa ter pelo menos 6 caracteres.' }, 400);
 
-    const { data: check, error } = await db.rpc('claim_check', { u, code: String(code ?? '') });
+    // Checks username + code and returns a one-time token the DB trigger requires on insert.
+    const { data: check, error } = await db.rpc('issue_claim_ticket', { u, code: String(code ?? '') });
     if (error) throw error;
     if (!check.ok) return reply({ error: check.error }, 400);
 
@@ -26,8 +27,7 @@ Deno.serve(async (req) => {
       email,
       password: String(password),
       email_confirm: true,
-      user_metadata: { name: check.name },
-      app_metadata: { mimo_username: u }, // only the admin API can set this; the DB trigger trusts it
+      user_metadata: { name: check.name, claim: check.token }, // present on insert, unlike app_metadata
     });
     if (e2) {
       const taken = /already|exists|registered/i.test(e2.message);
