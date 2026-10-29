@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js';
 import { registerSW, pushState, enablePush, disablePush } from './push.js';
 import { installed, canPrompt, promptInstall, inAppBrowser, platform } from './install.js';
+import { startTour } from './tour.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const view = $('#view');
@@ -10,6 +11,7 @@ let user = null; // auth user
 let me = null; // { id, name } from profiles
 let booted = false;
 let seq = 0; // render token: a slow, older render never overwrites a newer one
+let recovering = false; // opened the e-mail "reset password" link
 
 // ---------- helpers ----------
 
@@ -155,8 +157,19 @@ async function render(focus = false) {
   const hash = location.hash;
   nav.hidden = !user;
   const first = hash.match(/^#\/primeiro-acesso(?:\/([\w.]+))?$/);
-  if (!user) return show(first ? firstAccess(first[1]) : hash === '#/entrar' ? login(false) : hash === '#/criar-conta' ? login(true) : landing(), focus);
-  if (first || hash === '#/entrar' || hash === '#/criar-conta') return go('#/');
+  const forgot = hash.match(/^#\/esqueci-senha(?:\/([\w.@+-]+))?$/);
+  if (!user) {
+    return show(first ? firstAccess(first[1]) : forgot ? forgotPassword(forgot[1]) : hash === '#/entrar' ? login(false)
+      : hash === '#/criar-conta' ? login(true) : landing(), focus);
+  }
+  if (recovering) return show(newPassword(), focus);
+  if (first || forgot || hash === '#/entrar' || hash === '#/criar-conta') return go('#/');
+  // Links from alerts open the event they talk about.
+  const ev = hash.match(/^#\/evento\/([0-9a-f-]{36})$/);
+  if (ev) {
+    remember('mimo_event', ev[1]);
+    return go('#/');
+  }
 
   const route = routes.find(([re]) => re.test(hash));
   if (!route) return go('#/');
@@ -168,7 +181,9 @@ async function render(focus = false) {
   updateBadge();
   try {
     const el = await fn(...hash.match(re).slice(1));
-    if (token === seq) show(el, focus);
+    if (token !== seq) return;
+    show(el, focus);
+    el.afterShow?.();
   } catch (e) {
     if (token !== seq) return;
     const el = section(`<p class="empty">Não deu para carregar. ${esc(friendly(e))}</p><button class="btn" data-act="retry">Tentar de novo</button>`);
@@ -219,7 +234,7 @@ function landing() {
       <section class="panel how" aria-labelledby="how-title">
         <h2 id="how-title">Como funciona</h2>
         <ol class="steps">
-          <li>${tile('users')}<div><h3>O admin cria a família</h3><p>Quem organiza o Natal cria a família e um usuário para cada pessoa. Manda o convite pelo WhatsApp e pronto.</p></div></li>
+          <li>${tile('users')}<div><h3>O admin cria a família e o evento</h3><p>Quem organiza cria a família, um evento (como o Natal) e um usuário para cada pessoa. Manda o convite pelo WhatsApp e pronto.</p></div></li>
           <li>${tile('list')}<div><h3>Cada um monta sua lista</h3><p>Coloque o que você quer ganhar, com o link da loja e detalhes como tamanho, cor ou modelo.</p></div></li>
           <li>${tile('bell')}<div><h3>A família fica sabendo</h3><p>Entrou pedido novo numa lista? Todo mundo da família recebe um alerta.</p></div></li>
           <li>${tile('check')}<div><h3>Comprou, marcou “Comprei”</h3><p>O presente sai da lista dos outros, para ninguém comprar repetido. Quem vai ganhar não fica sabendo de nada.</p></div></li>
@@ -247,6 +262,7 @@ function landing() {
       <section class="faq" aria-labelledby="faq-title">
         <h2 id="faq-title">Perguntas frequentes</h2>
         <div class="stack">
+          <details><summary>Dá para ter mais de uma família ou evento?</summary><p>Sim. Entre em outras famílias com o código delas, e cada família pode ter vários eventos: Natal, amigo secreto, aniversários. Cada um tem a sua lista.</p></details>
           <details><summary>É grátis?</summary><p>Sim. É só criar a conta e começar a montar a lista.</p></details>
           <details><summary>Quem vê quem comprou cada presente?</summary><p>O resto da família vê, para ninguém comprar a mesma coisa. Quem vai ganhar não vê nada: nem que foi comprado, nem por quem.</p></details>
           <details><summary>Preciso instalar alguma coisa?</summary><p>Não. Funciona no navegador. Se quiser, adicione à tela inicial para abrir como um app.</p></details>
@@ -322,6 +338,81 @@ function firstAccess(prefill = '') {
   return el;
 }
 
+// Forgot password: the family admin gives a one-time code (works for any account);
+// accounts with a real e-mail can also get a link by e-mail.
+function forgotPassword(prefill = '') {
+  const el = section(`
+    <div class="auth">
+    <h2>Esqueci a senha</h2>
+    <p class="muted">Peça ao admin da sua família um <strong>código de nova senha</strong>. Ele gera em Família → Pessoas.</p>
+    <form id="f-reset" class="card stack">
+      <label>Usuário ou e-mail
+        <input name="login" required autocomplete="username" autocapitalize="none" spellcheck="false" value="${esc(prefill)}" placeholder="Ex.: renan.lag">
+      </label>
+      <label>Código de nova senha
+        <input name="code" required maxlength="6" autocapitalize="characters" autocomplete="one-time-code" spellcheck="false" placeholder="Ex.: K7P2QX" class="code">
+      </label>
+      <label>Nova senha
+        <input name="password" type="password" required minlength="6" autocomplete="new-password">
+      </label>
+      <label>Repita a nova senha
+        <input name="again" type="password" required minlength="6" autocomplete="new-password">
+      </label>
+      <button type="submit" class="btn primary big">Salvar nova senha</button>
+    </form>
+    <details class="card by-email">
+      <summary>Entra com um e-mail de verdade? Receba um link</summary>
+      <form id="f-mail" class="stack">
+        <label>Seu e-mail
+          <input name="email" type="email" required autocomplete="email" inputmode="email">
+        </label>
+        <button type="submit" class="btn">Enviar link</button>
+      </form>
+    </details>
+    <p class="muted switch"><a href="#/entrar">Voltar para entrar</a></p>
+    </div>`);
+  const reset = $('#f-reset', el);
+  reset.onsubmit = submit(reset, async (f) => {
+    if (f.password !== f.again) throw new Error('As duas senhas estão diferentes.');
+    const { data, error } = await supabase.functions.invoke('reset-password', { body: { login: f.login, code: f.code, password: f.password } });
+    if (error) throw new Error((await error.context?.json?.().catch(() => null))?.error ?? 'Não deu certo agora. Tente de novo.');
+    toast('Senha nova salva! 🎄');
+    // Success fires onAuthStateChange, which renders the app.
+    ok(await supabase.auth.signInWithPassword({ email: data.email, password: f.password }));
+  });
+  const mail = $('#f-mail', el);
+  mail.onsubmit = submit(mail, async (f) => {
+    ok(await supabase.auth.resetPasswordForEmail(f.email.trim(), { redirectTo: location.origin + location.pathname }));
+    toast('Se esse e-mail tiver conta, chega um link em instantes. Abra neste mesmo aparelho.');
+  });
+  return el;
+}
+
+function newPassword() {
+  const el = section(`
+    <div class="auth">
+    <h2>Crie uma senha nova</h2>
+    <form id="f-new" class="card stack">
+      <label>Nova senha
+        <input name="password" type="password" required minlength="6" autocomplete="new-password">
+      </label>
+      <label>Repita a nova senha
+        <input name="again" type="password" required minlength="6" autocomplete="new-password">
+      </label>
+      <button type="submit" class="btn primary big">Salvar nova senha</button>
+    </form>
+    </div>`);
+  const form = $('#f-new', el);
+  form.onsubmit = submit(form, async (f) => {
+    if (f.password !== f.again) throw new Error('As duas senhas estão diferentes.');
+    ok(await supabase.auth.updateUser({ password: f.password }));
+    recovering = false;
+    toast('Senha nova salva! 🎄');
+    go('#/');
+  });
+  return el;
+}
+
 function login(signup) {
   const el = section(`
     <div class="auth">
@@ -352,7 +443,7 @@ function login(signup) {
       </label>
       <button type="submit" class="btn primary big">${signup ? 'Criar conta' : 'Entrar'}</button>
     </form>
-    <p class="muted switch">${signup ? 'Já tem conta? <a href="#/entrar">Entrar</a>' : 'Recebeu usuário e código? <a href="#/primeiro-acesso">Primeiro acesso</a><br>Vai organizar a família? <a href="#/criar-conta">Criar conta</a>'}</p>
+    <p class="muted switch">${signup ? 'Já tem conta? <a href="#/entrar">Entrar</a>' : '<a href="#/esqueci-senha">Esqueci a senha</a><br>Recebeu usuário e código? <a href="#/primeiro-acesso">Primeiro acesso</a><br>Vai organizar a família? <a href="#/criar-conta">Criar conta</a>'}</p>
     </div>`);
   const form = $('#f-auth', el);
   if (signup) {
@@ -405,8 +496,8 @@ const buyActions = {
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 const PAGE = 10;
-// Filters survive re-renders (e.g. after "Comprei este") for the whole session.
-const give = { owner: '', status: 'open', q: '', limit: PAGE };
+// Filters survive re-renders (e.g. after "Comprei este") for the whole session; reset per event.
+const give = { event: null, owner: '', status: 'open', q: '', limit: PAGE };
 let mineLimit = PAGE;
 
 // Escapes LIKE wildcards so a typed "%" or "_" matches literally.
@@ -414,6 +505,82 @@ const likeTerm = (q) => `%${q.replace(/[\\%_]/g, (c) => '\\' + c)}%`;
 
 const moreButton = (act, shown, total) => (total > shown
   ? `<button class="btn more" data-act="${act}">Mostrar mais <span class="muted">(${shown} de ${total})</span></button>` : '');
+
+// Per-device conveniences (current event, tour seen). Private mode just forgets them.
+const remember = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* private mode */ } };
+const recall = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+
+// ---------- current family + event ----------
+// Every wish lives in one event of one family; the app always shows one event at a time.
+const ctx = { families: [], events: [], family: null, event: null };
+
+const fmtDay = (d) => (d ? new Date(d + 'T12:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }) : '');
+// Next upcoming event, else the most recent one.
+function pickEvent(evs) {
+  const today = new Date().toISOString().slice(0, 10);
+  return evs.find((e) => e.event_date && e.event_date >= today) ?? evs.at(-1) ?? null;
+}
+
+async function loadCtx() {
+  const [fams, evs] = await Promise.all([
+    supabase.from('families').select('id, name, owner_id').order('created_at').then(ok),
+    supabase.from('events').select('id, name, event_date, family_id').order('event_date', { nullsFirst: false }).order('created_at').then(ok),
+  ]);
+  Object.assign(ctx, { families: fams, events: evs });
+  ctx.event = evs.find((e) => e.id === recall('mimo_event')) ?? null;
+  ctx.family = fams.find((f) => f.id === (ctx.event?.family_id ?? recall('mimo_family'))) ?? fams[0] ?? null;
+  if (!ctx.event && ctx.family) ctx.event = pickEvent(evs.filter((e) => e.family_id === ctx.family.id));
+  remember('mimo_family', ctx.family?.id);
+  remember('mimo_event', ctx.event?.id);
+  if (give.event !== ctx.event?.id) Object.assign(give, { event: ctx.event?.id, owner: '', status: 'open', q: '', limit: PAGE });
+}
+
+function useEvent(ev) {
+  remember('mimo_event', ev.id);
+  remember('mimo_family', ev.family_id);
+}
+
+const isAdmin = (fam) => fam?.owner_id === me.id;
+const natalName = () => {
+  const d = new Date();
+  return `Natal ${d.getMonth() === 11 && d.getDate() > 25 ? d.getFullYear() + 1 : d.getFullYear()}`;
+};
+
+// Family/event switcher, in a sheet so it works the same on any screen.
+function openSwitcher() {
+  const dlg = $('#sheet');
+  $('#sheet-body').innerHTML = `
+    <h2>Trocar evento</h2>
+    ${ctx.families.map((f) => {
+      const evs = ctx.events.filter((e) => e.family_id === f.id);
+      return `<div class="sheet-group">
+        <h3>${esc(f.name)} ${isAdmin(f) ? '<span class="tag admin">Admin</span>' : ''}</h3>
+        ${evs.length ? evs.map((e) => `<button class="pick${e.id === ctx.event?.id ? ' on' : ''}" data-ev="${esc(e.id)}">
+          <span>${esc(e.name)}</span><small>${fmtDay(e.event_date)}</small></button>`).join('')
+        : `<p class="muted small">Nenhum evento ainda.${isAdmin(f) ? '' : ' O admin vai criar.'}</p>`}
+        ${isAdmin(f) ? `<a class="btn small" href="#/familia/${esc(f.id)}" data-close>${ico('plus')} Criar evento</a>` : ''}
+      </div>`;
+    }).join('')}
+    <a class="btn" href="#/familias" data-close>Entrar em outra família com código</a>`;
+  $('#sheet-body').onclick = (e) => {
+    const pick = e.target.closest('[data-ev]');
+    if (pick) {
+      useEvent(ctx.events.find((x) => x.id === pick.dataset.ev));
+      dlg.close();
+      return go('#/');
+    }
+    if (e.target.closest('[data-close]')) dlg.close();
+  };
+  dlg.showModal();
+}
+$('#sheet-close').onclick = () => $('#sheet').close();
+
+const ctxBar = () => `
+  <button class="ctx-bar" data-act="switch" aria-label="Evento atual: ${esc(ctx.event?.name ?? 'nenhum')}, família ${esc(ctx.family?.name)}. Trocar">
+    <span class="ctx-ico" aria-hidden="true">🎄</span>
+    <span class="ctx-text"><strong>${esc(ctx.event?.name ?? 'Sem evento')}</strong><small>${esc(ctx.family?.name)}${ctx.event?.event_date ? ' · ' + fmtDay(ctx.event.event_date) : ''}</small></span>
+    <span class="ctx-swap">Trocar</span>
+  </button>`;
 
 const giveItem = (g, mineBought) => `
   <li class="item gift${mineBought ? ' bought' : ''}">
@@ -442,14 +609,16 @@ async function loadGive(box) {
   const cols = 'id, title, url, note, owner_id, created_at, profiles(name)';
   let rows, count;
   if (give.status === 'mine') {
-    let q = supabase.from('purchases').select(`created_at, gifts!inner(${cols})`, { count: 'exact' }).eq('buyer_id', me.id);
+    let q = supabase.from('purchases').select(`created_at, gifts!inner(${cols})`, { count: 'exact' })
+      .eq('buyer_id', me.id).eq('gifts.event_id', ctx.event.id);
     if (give.owner) q = q.eq('gifts.owner_id', give.owner);
     if (give.q) q = q.ilike('gifts.title', likeTerm(give.q));
     ({ data: rows, count } = ok2(await q.order('created_at', { ascending: false }).range(0, give.limit - 1)));
     rows = rows.map((r) => r.gifts);
   } else {
     // Anti-join: only gifts nobody bought yet. Owners never reach this (it's other people's gifts).
-    let q = supabase.from('gifts').select(`${cols}, purchases(gift_id)`, { count: 'exact' }).neq('owner_id', me.id).is('purchases', null);
+    let q = supabase.from('gifts').select(`${cols}, purchases(gift_id)`, { count: 'exact' })
+      .eq('event_id', ctx.event.id).neq('owner_id', me.id).is('purchases', null);
     if (give.owner) q = q.eq('owner_id', give.owner);
     if (give.q) q = q.ilike('title', likeTerm(give.q));
     ({ data: rows, count } = ok2(await q.order('created_at', { ascending: false }).range(0, give.limit - 1)));
@@ -465,7 +634,7 @@ async function loadGive(box) {
 
 async function loadMine(box) {
   const { data: rows, count } = ok2(await supabase.from('gifts').select('id, title, url, note', { count: 'exact' })
-    .eq('owner_id', me.id).order('created_at', { ascending: false }).range(0, mineLimit - 1));
+    .eq('event_id', ctx.event.id).eq('owner_id', me.id).order('created_at', { ascending: false }).range(0, mineLimit - 1));
   box.rows = rows;
   box.innerHTML = rows.length
     ? `<ul class="list">${rows.map(mineItem).join('')}</ul>${moreButton('moreMine', rows.length, count)}`
@@ -478,38 +647,157 @@ function ok2({ data, count, error }) {
   return { data, count };
 }
 
-// Everything on one screen: install/notify nudge, add my wish, my family, what I can give, my wishes.
-async function home() {
-  const [people, fams, counts] = await Promise.all([
-    supabase.from('profiles').select('id, name').neq('id', me.id).order('name').then(ok),
-    supabase.from('families').select('id, owner_id').order('created_at').then(ok),
-    supabase.from('gifts').select('owner_id').neq('owner_id', me.id).then(ok),
-  ]);
-  if (give.owner && !people.some((p) => p.id === give.owner)) give.owner = '';
-  const wishesOf = (id) => counts.filter((g) => g.owner_id === id).length;
-  const myFam = fams.find((f) => f.owner_id === me.id);
-  const addPeople = myFam ? `<a class="btn small" href="#/familia/${esc(myFam.id)}">${ico('plus')} Adicionar pessoa</a>` : '';
-
+// No family yet: join one with a code (most people) or start one (the organizer).
+function noFamily() {
   const el = section(`
     <div id="nudge"></div>
     <p class="hello">Oi, ${esc(me.name)}! 🎄</p>
+    <div class="intro">
+      <h2>Vamos começar</h2>
+      <p>Você ainda não está em nenhuma família. Escolha uma opção:</p>
+    </div>
+    ${joinForm()}
+    ${createFamilyForm()}`);
+  wireFamilyForms(el);
+  return el;
+}
+
+const joinForm = () => `
+  <form id="f-join" class="card stack">
+    <h3>Tenho um código de família</h3>
+    <p class="muted small">Peça o código para quem organiza a família.</p>
+    <label>Código da família
+      <input name="code" required maxlength="6" autocapitalize="characters" spellcheck="false" autocomplete="off" placeholder="Ex.: K7P2QX" class="code">
+    </label>
+    <button type="submit" class="btn primary">Entrar na família</button>
+  </form>`;
+
+const createFamilyForm = () => `
+  <form id="f-fam" class="card stack">
+    <h3>Vou organizar uma família</h3>
+    <p class="muted small">Você vira o admin: cria os eventos e adiciona as pessoas.</p>
+    <label>Nome da família
+      <input name="name" required maxlength="80" pattern=".*\\S.*" placeholder="Ex.: Família Silva">
+    </label>
+    <button type="submit" class="btn">Criar família</button>
+  </form>`;
+
+function wireFamilyForms(el) {
+  const join = $('#f-join', el);
+  if (join) join.onsubmit = submit(join, async (f) => {
+    const fam = ok(await supabase.rpc('join_with_code', { code: f.code }));
+    if (!fam) throw new Error('Código não encontrado. Confira as letras e tente de novo.');
+    remember('mimo_family', fam);
+    remember('mimo_event', null);
+    toast('Você entrou na família! 🎄');
+    go('#/');
+  });
+  const create = $('#f-fam', el);
+  if (create) create.onsubmit = submit(create, async (f) => {
+    const fam = ok(await supabase.from('families').insert({ name: f.name.trim() }).select('id').single());
+    remember('mimo_family', fam.id);
+    remember('mimo_event', null);
+    go('#/'); // the home now walks the admin through the first event
+  });
+}
+
+// Admin's first step: create the event the wishes will live in.
+const eventForm = (id, title, intro) => `
+  <form id="${id}" class="card stack event-form">
+    ${title}
+    ${intro}
+    <div class="chips" role="group" aria-label="Sugestões">
+      ${[natalName(), 'Amigo secreto', 'Aniversário', 'Dia das Crianças'].map((n) =>
+        `<button type="button" class="chip-btn" data-suggest="${esc(n)}">${esc(n)}</button>`).join('')}
+    </div>
+    <label>Nome do evento
+      <input name="name" required maxlength="60" pattern=".*\\S.*" placeholder="Ex.: ${esc(natalName())}" autocomplete="off">
+    </label>
+    <label>Data (se quiser)
+      <input name="date" type="date">
+    </label>
+    <button type="submit" class="btn primary big">Criar evento</button>
+  </form>`;
+
+function wireEventForm(form, familyId) {
+  form.onclick = (e) => {
+    const s = e.target.closest('[data-suggest]');
+    if (!s) return;
+    form.elements.name.value = s.dataset.suggest;
+    if (s.dataset.suggest.startsWith('Natal')) form.elements.date.value = `${s.dataset.suggest.slice(-4)}-12-25`;
+    form.elements.name.focus();
+  };
+  form.onsubmit = submit(form, async (f) => {
+    const ev = ok(await supabase.from('events').insert({ family_id: familyId, name: f.name.trim(), event_date: f.date || null })
+      .select('id, family_id').single());
+    useEvent(ev);
+    toast('Evento criado! Agora é só fazer os pedidos 🎁');
+    go('#/');
+  });
+}
+
+function noEvent() {
+  const admin = isAdmin(ctx.family);
+  const el = section(`
+    <div id="nudge"></div>
+    ${ctx.families.length > 1 || ctx.events.length ? ctxBar() : ''}
+    <p class="hello">Oi, ${esc(me.name)}! 🎄</p>
+    ${admin ? eventForm('f-event', '<span class="step-chip">Primeiro passo</span><h2>Crie o primeiro evento</h2>',
+      `<p>O evento é a ocasião dos presentes, como o Natal. Os pedidos da família <strong>${esc(ctx.family.name)}</strong> ficam dentro dele.</p>`)
+    : emptyState('gift', 'Ainda não tem evento', `Quem organiza a família ${esc(ctx.family.name)} vai criar um evento, como o Natal. Aí você já pode fazer seus pedidos.`)}`);
+  if (admin) wireEventForm($('#f-event', el), ctx.family.id);
+  on(el, { switch: openSwitcher });
+  return el;
+}
+
+const TOUR_KEY = 'mimo_tour';
+function tourSteps() {
+  return [
+    { target: '.ctx-bar', title: 'Família e evento', text: 'Aqui aparece o evento de agora. Toque para trocar de família ou de evento.' },
+    { target: '[data-act=add]', title: 'Seu pedido', text: 'Toque aqui para dizer o que você quer ganhar. Dá para colocar o link da loja.' },
+    { target: '#h-fam', title: 'Sua família', text: 'Toque numa pessoa para ver os pedidos dela.' },
+    { target: '#h-give', title: 'Presentes para dar', text: 'Comprou algo? Toque em “Comprei este”. Quem vai ganhar não fica sabendo.' },
+    { target: '#nav', title: 'Menu', text: isAdmin(ctx.family)
+      ? 'Em Família você cria eventos, adiciona pessoas e vê o código. Em Alertas ficam as novidades.'
+      : 'Em Família você vê as pessoas e entra em outras famílias. Em Alertas ficam as novidades.' },
+  ];
+}
+
+// Home = one event: install/notify nudge, add my wish, my family, what I can give, my wishes.
+async function home() {
+  await loadCtx();
+  if (!ctx.family) return noFamily();
+  if (!ctx.event) return noEvent();
+  const [people, counts] = await Promise.all([
+    supabase.from('family_members').select('user_id, profiles(name)').eq('family_id', ctx.family.id).neq('user_id', me.id).then(ok),
+    supabase.from('gifts').select('owner_id').eq('event_id', ctx.event.id).neq('owner_id', me.id).then(ok),
+  ]);
+  people.sort((a, b) => (a.profiles?.name ?? '').localeCompare(b.profiles?.name ?? ''));
+  if (give.owner && !people.some((p) => p.user_id === give.owner)) give.owner = '';
+  const wishesOf = (id) => counts.filter((g) => g.owner_id === id).length;
+  const admin = isAdmin(ctx.family);
+  const addPeople = admin ? `<a class="btn small" href="#/familia/${esc(ctx.family.id)}">${ico('plus')} Adicionar pessoa</a>` : '';
+
+  const el = section(`
+    <div id="nudge"></div>
+    ${ctxBar()}
     <div class="feature">
       <h2>O que você quer ganhar?</h2>
-      <p>Conte para a família. Dá para colocar o link da loja, o tamanho e a cor.</p>
+      <p>Conte para a família o que você quer no ${esc(ctx.event.name)}. Dá para colocar o link da loja, o tamanho e a cor.</p>
       <button class="btn dark big" data-act="add">${ico('plus')} Adicionar meu pedido</button>
     </div>
 
     <section class="block" aria-labelledby="h-fam">
       <div class="head"><h2 id="h-fam">Minha família</h2>${addPeople}</div>
-      ${people.length ? `<p class="muted">Toque numa pessoa para ver todos os pedidos dela.</p>
+      ${people.length ? `<p class="muted">Toque numa pessoa para ver os pedidos dela.</p>
       <ul class="list people">${people.map((p) => `
-        <li><a class="item link-item" href="#/pessoa/${esc(p.id)}">
-          <span class="tile initial" aria-hidden="true">${initial(p.name)}</span>
-          <span class="item-title">${esc(p.name)}<small>${plural(wishesOf(p.id), 'pedido', 'pedidos')}</small></span>
+        <li><a class="item link-item" href="#/pessoa/${esc(p.user_id)}">
+          <span class="tile initial" aria-hidden="true">${initial(p.profiles?.name)}</span>
+          <span class="item-title">${esc(p.profiles?.name ?? 'Alguém')}<small>${plural(wishesOf(p.user_id), 'pedido', 'pedidos')}</small></span>
         </a></li>`).join('')}</ul>`
-      : emptyState('users', 'Sua família ainda está vazia', myFam
-        ? 'Toque em “Adicionar pessoa” e coloque o e-mail de cada um.'
-        : 'Peça para quem organiza a família adicionar o seu e-mail.')}
+      : emptyState('users', 'Só você por aqui', admin
+        ? 'Toque em “Adicionar pessoa” para chamar a família.'
+        : 'Quem organiza a família vai adicionar as outras pessoas.')}
     </section>
 
     <section class="block" aria-labelledby="h-give">
@@ -522,7 +810,7 @@ async function home() {
         </div>
         ${people.length > 1 ? `<label class="inline">Pessoa
           <select id="f-owner"><option value="">Todas</option>${people.map((p) =>
-            `<option value="${esc(p.id)}"${p.id === give.owner ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+            `<option value="${esc(p.user_id)}"${p.user_id === give.owner ? ' selected' : ''}>${esc(p.profiles?.name ?? 'Alguém')}</option>`).join('')}</select>
         </label>` : ''}
         <label class="inline grow">Procurar
           <input id="f-q" type="search" value="${esc(give.q)}" placeholder="Ex.: livro" autocomplete="off" enterkeyhint="search">
@@ -549,6 +837,7 @@ async function home() {
 
   on(el, {
     ...buyActions,
+    switch: openSwitcher,
     status: (v) => {
       give.status = v;
       for (const b of el.querySelectorAll('[data-act=status]')) b.setAttribute('aria-pressed', b.dataset.id === v);
@@ -566,6 +855,8 @@ async function home() {
     },
   });
   await Promise.all([loadGive(giveBox), loadMine(mineBox), nudge($('#nudge', el))]);
+  // First visit: a short tour once the screen is on the page.
+  if (!recall(TOUR_KEY)) el.afterShow = () => startTour(tourSteps(), { onDone: () => remember(TOUR_KEY, '1') });
   return el;
 }
 
@@ -573,7 +864,7 @@ function giftDialog(gift) {
   const dlg = $('#gift-dialog');
   const form = $('#gift-form');
   const error = $('#gift-error');
-  $('#gift-dialog-title').textContent = gift ? 'Editar meu pedido' : 'Novo pedido';
+  $('#gift-dialog-title').textContent = gift ? 'Editar meu pedido' : `Novo pedido · ${ctx.event.name}`;
   for (const k of ['title', 'url', 'note']) form.elements[k].value = gift?.[k] ?? '';
   error.textContent = '';
   // Errors show inside the dialog: the toast sits under the modal's top layer.
@@ -586,7 +877,8 @@ function giftDialog(gift) {
     if (row.url && !validUrl(row.url)) return (error.textContent = 'O link precisa ser um endereço começando com http:// ou https://');
     btn.disabled = true;
     try {
-      ok(gift ? await supabase.from('gifts').update(row).eq('id', gift.id) : await supabase.from('gifts').insert(row));
+      ok(gift ? await supabase.from('gifts').update(row).eq('id', gift.id)
+        : await supabase.from('gifts').insert({ ...row, event_id: ctx.event.id }));
       dlg.close();
       toast(gift ? 'Pedido atualizado!' : 'Pedido adicionado! A família vai ser avisada 🎁');
       render();
@@ -602,33 +894,25 @@ function giftDialog(gift) {
 $('#gift-cancel').onclick = () => $('#gift-dialog').close();
 
 async function families() {
-  const fams = ok(await supabase.from('families').select('id, name, owner_id').order('created_at'));
+  await loadCtx();
   const el = section(`
     <h2>Família</h2>
-    ${fams.length ? `<ul class="list">${fams.map((f) => `
+    ${ctx.families.length ? `<ul class="list">${ctx.families.map((f) => `
       <li><a class="item link-item" href="#/familia/${esc(f.id)}">
-        ${tile('home')}<span class="item-title">${esc(f.name)}</span>${f.owner_id === me.id ? '<span class="tag admin">Admin</span>' : '<span class="tag">Membro</span>'}
+        ${tile('home')}<span class="item-title">${esc(f.name)}<small>${plural(ctx.events.filter((e) => e.family_id === f.id).length, 'evento', 'eventos')}</small></span>
+        ${isAdmin(f) ? '<span class="tag admin">Admin</span>' : '<span class="tag">Membro</span>'}
       </a></li>`).join('')}</ul>`
-    : emptyState('users', 'Você ainda não está em nenhuma família', 'Crie a sua aqui embaixo ou peça para o admin da sua família adicionar seu e-mail.')}
-    <form id="f-fam" class="card stack">
-      <h3>Criar uma família</h3>
-      <p class="muted small">Você vira o admin e pode adicionar as pessoas pelo e-mail.</p>
-      <label>Nome da família
-        <input name="name" required maxlength="80" pattern=".*\\S.*" placeholder="Ex.: Família Silva">
-      </label>
-      <button type="submit" class="btn primary">Criar</button>
-    </form>`);
-  const form = $('#f-fam', el);
-  form.onsubmit = submit(form, async (f) => {
-    const fam = ok(await supabase.from('families').insert({ name: f.name.trim() }).select('id').single());
-    go('#/familia/' + fam.id);
-  });
+    : emptyState('users', 'Você ainda não está em nenhuma família', 'Entre com o código que a família mandou ou crie a sua.')}
+    ${joinForm()}
+    ${createFamilyForm()}`);
+  wireFamilyForms(el);
   return el;
 }
 
 // Opens the invite with explicit buttons: share/copy need a fresh tap, not the end of an await.
-function shareInvite(text) {
+function shareInvite(text, title = 'Convite pronto 🎄') {
   const dlg = $('#invite-dialog');
+  $('#invite-title').textContent = title;
   const field = $('#invite-text');
   field.value = text;
   $('#invite-wa').href = 'https://wa.me/?text=' + encodeURIComponent(text);
@@ -647,9 +931,10 @@ const orTerm = (q) => likeTerm(q.replace(/[,()]/g, ' '));
 
 async function family(id) {
   if (people.fam !== id) Object.assign(people, { fam: id, status: 'active', q: '', limit: PAGE });
-  const [fam, code] = await Promise.all([
+  const [fam, code, events] = await Promise.all([
     supabase.from('families').select('id, name, owner_id').eq('id', id).maybeSingle().then(ok),
     supabase.rpc('family_access_code', { fam: id }).then(ok), // null unless I'm the admin
+    supabase.from('events').select('id, name, event_date, family_id').eq('family_id', id).order('event_date', { nullsFirst: false }).order('created_at').then(ok),
   ]);
   if (!fam) return section('<a class="back" href="#/familias">← Família</a><p class="empty">Família não encontrada.</p>');
   const owner = fam.owner_id === me.id;
@@ -666,6 +951,23 @@ async function family(id) {
   const el = section(`
     <a class="back" href="#/familias">← Família</a>
     <h2>${esc(fam.name)}</h2>
+    <section class="block" aria-labelledby="h-events">
+      <div class="head"><h2 id="h-events">Eventos</h2></div>
+      ${events.length ? `<ul class="list">${events.map((e) => `
+        <li class="item${owner ? ' wrap' : ''}">
+          ${tile('gift')}
+          <span class="item-title">${esc(e.name)}<small>${e.event_date ? fmtDay(e.event_date) : 'sem data'}</small></span>
+          <div class="actions">
+            <button class="btn small primary" data-act="openEvent" data-id="${esc(e.id)}">Abrir</button>
+            ${owner ? `<button class="btn small danger" data-act="delEvent" data-id="${esc(e.id)}" data-name="${esc(e.name)}">Apagar</button>` : ''}
+          </div>
+        </li>`).join('')}</ul>`
+      : emptyState('gift', 'Nenhum evento ainda', owner ? 'Crie o primeiro aqui embaixo, como o Natal.' : 'Quem organiza a família vai criar.')}
+      ${owner ? `<details class="card by-email"${events.length ? '' : ' open'}>
+        <summary>Criar evento</summary>
+        ${eventForm('f-event', '', '<p class="muted small">Ex.: Natal, amigo secreto, aniversário. Cada evento tem a sua lista de pedidos.</p>')}
+      </details>` : ''}
+    </section>
     <section class="block" aria-labelledby="h-people">
       <div class="head"><h2 id="h-people">Pessoas</h2></div>
       <div class="filters" role="group" aria-label="Filtrar pessoas">
@@ -754,7 +1056,9 @@ async function family(id) {
           <span class="tile initial" aria-hidden="true">${initial(name)}</span>
           <span class="item-title"><a href="${mine ? '#/' : '#/pessoa/' + esc(m.user_id)}">${esc(name)}${mine ? ' (você)' : ''}</a>${m.profiles?.username ? `<small>${esc(m.profiles.username)}</small>` : ''}</span>
           ${m.user_id === fam.owner_id ? '<span class="tag admin">Admin</span>' : '<span class="tag">Membro</span>'}
-          ${owner && m.user_id !== fam.owner_id ? `<div class="actions"><button class="btn small danger" data-act="remove" data-id="${esc(m.user_id)}" data-name="${esc(name)}">Remover</button></div>` : ''}
+          ${owner && m.user_id !== fam.owner_id ? `<div class="actions">
+            <button class="btn small" data-act="resetPass" data-id="${esc(m.user_id)}" data-name="${esc(name)}" data-login="${esc(m.profiles?.username ?? '')}">Nova senha</button>
+            <button class="btn small danger" data-act="remove" data-id="${esc(m.user_id)}" data-name="${esc(name)}">Remover</button></div>` : ''}
         </li>`;
       };
     }
@@ -771,6 +1075,9 @@ async function family(id) {
     typing = setTimeout(() => { people.q = e.target.value.trim(); people.limit = PAGE; loadPeople().catch((err) => toast(friendly(err))); }, 300);
   };
   await loadPeople();
+
+  const evForm = $('#f-event', el);
+  if (evForm) wireEventForm(evForm, id);
 
   const userForm = $('#f-user', el);
   if (userForm) {
@@ -820,6 +1127,20 @@ async function family(id) {
       return loadPeople();
     },
     morePeople: () => { people.limit += PAGE; return loadPeople(); },
+    openEvent: (ev) => { useEvent(events.find((e) => e.id === ev)); go('#/'); },
+    delEvent: async (ev, btn) => {
+      if (!await ask(`Apagar o evento "${btn.dataset.name}"? Os pedidos dele também vão embora.`, 'Apagar evento')) return;
+      ok(await supabase.from('events').delete().eq('id', ev));
+      render();
+    },
+    resetPass: async (uid, btn) => {
+      if (!await ask(`Gerar um código de nova senha para ${btn.dataset.name}? Vale por 24 horas e só uma vez.`, 'Gerar código')) return;
+      const c = ok(await supabase.rpc('issue_password_reset', { member: uid }));
+      const login = btn.dataset.login;
+      shareInvite(`Oi, ${btn.dataset.name}! Seu código para criar uma senha nova no Me Dá Mimo é ${c} (vale 24 horas).\n`
+        + `Abra ${location.origin + location.pathname}#/esqueci-senha${login ? '/' + login : ''}`
+        + (login ? `\nUsuário: ${login}` : '\nUse o seu e-mail de sempre.'), 'Código de nova senha 🔑');
+    },
     copyCode: async (_, btn) => flash(btn, await copyText(code) ? 'Copiado ✔' : code),
     sendInvite: (u, btn) => shareInvite(inviteText({ username: u, name: btn.dataset.name })),
     unpend: async (u) => {
@@ -861,10 +1182,12 @@ async function person(id) {
     go('#/');
     return section('');
   }
+  await loadCtx();
+  if (!ctx.event) return go('#/'), section('');
   const [p, gifts] = await Promise.all([
     supabase.from('profiles').select('name').eq('id', id).maybeSingle().then(ok),
     // shortcut: one person's list capped at 100, add paging if someone ever asks for more
-    supabase.from('gifts').select('id, title, url, note').eq('owner_id', id).order('created_at').limit(100).then(ok),
+    supabase.from('gifts').select('id, title, url, note').eq('owner_id', id).eq('event_id', ctx.event.id).order('created_at').limit(100).then(ok),
   ]);
   if (!p) return section('<a class="back" href="#/">← Início</a><p class="empty">Pessoa não encontrada.</p>');
   const buyOf = await purchasesOf(gifts);
@@ -875,6 +1198,7 @@ async function person(id) {
       <h2>Pedidos de ${esc(p.name)}</h2>
       <span class="chip">${gifts.length}</span>
     </div>
+    <p class="for">${esc(ctx.event.name)} · ${esc(ctx.family.name)}</p>
     <p class="muted">Escolha um presente e marque “Comprei este”. ${esc(p.name)} não fica sabendo de nada.</p>
     ${gifts.length ? `<ul class="list">${gifts.map((g) => `
       <li class="item gift${buyOf[g.id] ? ' bought' : ''}">
@@ -1036,6 +1360,11 @@ async function profile() {
       <h3>Notificações</h3>
       <div id="push" class="stack"></div>
     </div>
+    <div class="card stack">
+      <h3>Ajuda</h3>
+      <p class="muted small">Veja de novo o passo a passo do app.</p>
+      <button class="btn" data-act="tour">Ver o tour de novo</button>
+    </div>
     <p class="end"><button class="btn danger" data-act="logout">Sair da conta</button></p>`);
   const box = $('#push', el);
   await pushBox(box);
@@ -1060,6 +1389,7 @@ async function profile() {
     pushOff: async () => {
       try { await disablePush(supabase); } finally { await pushBox(box); }
     },
+    tour: () => { remember(TOUR_KEY, null); go('#/'); },
     logout: async () => {
       // Shared devices: stop sending this user's alerts here.
       await disablePush(supabase).catch(() => {});
@@ -1080,7 +1410,11 @@ async function start() {
   render(true);
 }
 
-supabase.auth.onAuthStateChange((_event, session) => {
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    recovering = true;
+    if (booted) setTimeout(() => render(true)); // same user: the early return below would skip the screen
+  }
   const next = session?.user ?? null;
   if (booted && next?.id === user?.id) return; // token refresh, etc.
   booted = true;

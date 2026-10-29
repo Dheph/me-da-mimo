@@ -1,0 +1,29 @@
+/* Tour guiado (tour.js). */
+.tour-block { position: fixed; inset: 0; z-index: 9000; }
+
+/* O recorte: a sombra gigante escurece todo o resto da tela. */
+.tour-hole {
+  position: fixed;
+  z-index: 9001;
+  pointer-events: none;
+  border-radius: var(--r-md, 18px);
+  box-shadow: 0 0 0 3px var(--gold, #F5B700), 0 0 0 9999px rgb(42 15 31 / .6);
+}
+
+.tour-card {
+  position: fixed;
+  z-index: 9002;
+  padding: 1.25rem 1.25rem 1rem;
+  background: var(--paper, #FFFFFF);
+  color: var(--ink, #2A1520);
+  font-family: var(--font, "Outfit", system-ui, sans-serif);
+  border-radius: var(--r-lg, 24px);
+  box-shadow: var(--shadow, 0 14px 32px -18px rgb(42 15 31 / .35)), 0 18px 40px -12px rgb(42 15 31 / .45);
+}
+.tour-count { margin: 0 0 .25rem; font-size: .95rem; font-weight: 600; color: var(--muted, #6E5560); }
+.tour-title { margin: 0 0 .4rem; font-size: 1.375rem; font-weight: 800; letter-spacing: -.01em; color: var(--plum, #2A0F1F); }
+.tour-text { margin: 0 0 1rem; font-size: 1.125rem; line-height: 1.5; }
+.tour-actions { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.tour-actions .btn { min-height: 48px; font-size: 1.0625rem; }
+.tour-actions .btn.link { padding-inline: .5rem; }
+.tour-card:focus { outline: none; }

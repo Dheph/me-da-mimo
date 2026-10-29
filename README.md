@@ -17,17 +17,24 @@
 
 ## Como funciona
 
-1. **Quem organiza cria a família.** Em "Criar conta", escolha *Admin da família* e dê um nome a ela.
+1. **Quem organiza cria a família** (em "Criar conta", escolha *Admin da família*) e logo em seguida o
+   **primeiro evento**, como o *Natal 2026*. O app guia esse passo.
 2. **O admin cria um usuário para cada pessoa** (ex.: `renan.lag`) e toca em **Enviar convite**. A
-   mensagem já vai com o link, o usuário e o **código da família**, pronta para o WhatsApp.
-3. **No primeiro acesso, a pessoa usa usuário + código e cria a própria senha.** Depois entra com
-   usuário e senha. Se quiser, cadastra um e-mail no Perfil para entrar com ele também.
-4. **Cada um faz os seus pedidos.** Toque em **Adicionar meu pedido** e diga o que quer ganhar, com o
-   link da loja e detalhes como tamanho e cor. A família recebe um aviso.
+   mensagem vai com o link, o usuário e o **código da família**, pronta para o WhatsApp.
+3. **No primeiro acesso, a pessoa usa usuário + código e cria a própria senha.** Um tour rápido mostra
+   onde fica cada coisa.
+4. **Cada um faz os seus pedidos no evento.** Toque em **Adicionar meu pedido**: link da loja, tamanho,
+   cor. A família recebe um aviso.
 5. **Comprou? Marque "Comprei este".** O presente sai da lista dos outros, para ninguém comprar
    repetido. **Quem vai ganhar não fica sabendo de nada**: nem que foi comprado, nem por quem.
 
-Prefere e-mail? O admin também pode adicionar pessoas pelo e-mail, e elas criam a conta sozinhas.
+**Várias famílias e eventos:** entre em outra família digitando o código dela (aba Família). Cada
+família pode ter vários eventos (Natal, amigo secreto, aniversário), cada um com a sua lista. O topo do
+início mostra o evento atual e o botão **Trocar**.
+
+**Esqueci a senha:** o admin toca em **Nova senha** ao lado da pessoa e manda o código. Ela abre
+"Esqueci a senha", digita usuário + código e cria uma senha nova. Quem entra com e-mail de verdade
+também pode pedir um link por e-mail.
 
 Tudo fica numa tela só: o botão de pedir, a sua família, os **presentes para dar** (com busca, filtro
 por pessoa e "que eu comprei") e os **seus pedidos**.
@@ -42,7 +49,7 @@ por pessoa e "que eu comprei") e os **seus pedidos**.
 | | Admin | Membro |
 |---|:---:|:---:|
 | Faz os próprios pedidos e compra presentes | ✅ | ✅ |
-| Cria usuários, gera o código e remove pessoas | ✅ | — |
+| Cria eventos e usuários, gera códigos e remove pessoas | ✅ | — |
 | Sai da família | — | ✅ |
 
 O admin também é membro: tem a própria lista e ganha presente como todo mundo. A mesma pessoa pode

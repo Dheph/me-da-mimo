@@ -1,6 +1,6 @@
 // Service worker: push + shell offline (network-first, só mesma origem).
-const CACHE = 'mimo-v9';
-const SHELL = ['./', './index.html', './app.js', './style.css', './supabase.js', './push.js', './install.js', './config.js',
+const CACHE = 'mimo-v10';
+const SHELL = ['./', './index.html', './app.js', './style.css', './supabase.js', './push.js', './install.js', './tour.js', './tour.css', './config.js',
   './manifest.webmanifest', './icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {

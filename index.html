@@ -15,6 +15,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..800&display=swap">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="tour.css">
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -53,6 +54,11 @@
         <button type="submit" class="btn primary">Salvar pedido</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="sheet" class="sheet" aria-label="Trocar evento">
+    <div id="sheet-body" class="stack"></div>
+    <div class="actions"><button type="button" class="btn link" id="sheet-close">Fechar</button></div>
   </dialog>
 
   <dialog id="ask-dialog" aria-labelledby="ask-text">
