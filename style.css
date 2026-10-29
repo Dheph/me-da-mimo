@@ -627,3 +627,6 @@ input.code { font-size: 1.4rem; letter-spacing: .3em; text-transform: uppercase;
 #invite-text { width: 100%; font: inherit; font-size: .95rem; resize: none; }
 .invite-actions { display: flex; flex-direction: column; gap: .5rem; }
 .invite-actions .btn { width: 100%; justify-content: center; }
+/* item whose buttons go on their own row (keeps the name readable on phones) */
+.item.wrap { flex-wrap: wrap; }
+.item.wrap .actions { flex-basis: 100%; margin: .15rem 0 0 calc(56px + .9rem); }

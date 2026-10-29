@@ -685,7 +685,7 @@ async function family(id) {
         </form>
         ${pending.length ? `<h3>Ainda não fizeram o primeiro acesso <span class="chip">${pending.length}</span></h3>
         <ul class="list">${pending.map((p) => `
-          <li class="item">
+          <li class="item wrap">
             <span class="tile initial" aria-hidden="true">${initial(p.name)}</span>
             <span class="item-title">${esc(p.name)}<small>${esc(p.username)}</small></span>
             <div class="actions">
