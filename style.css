@@ -630,3 +630,5 @@ input.code { font-size: 1.4rem; letter-spacing: .3em; text-transform: uppercase;
 /* item whose buttons go on their own row (keeps the name readable on phones) */
 .item.wrap { flex-wrap: wrap; }
 .item.wrap .actions { flex-basis: 100%; margin: .15rem 0 0 calc(56px + .9rem); }
+.item-title a { color: var(--plum); text-decoration-color: var(--coral); text-decoration-thickness: 2px; }
+.seg .btn .chip { margin-left: .2rem; }

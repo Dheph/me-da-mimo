@@ -640,34 +640,44 @@ function shareInvite(text) {
   dlg.showModal();
 }
 
+// "Pessoas" filter state; reset when another family is opened.
+const people = { fam: null, status: 'active', q: '', limit: PAGE };
+// For PostgREST or(): drop the characters that are its own syntax.
+const orTerm = (q) => likeTerm(q.replace(/[,()]/g, ' '));
+
 async function family(id) {
-  const [fam, members, invites, pending, code] = await Promise.all([
+  if (people.fam !== id) Object.assign(people, { fam: id, status: 'active', q: '', limit: PAGE });
+  const [fam, code] = await Promise.all([
     supabase.from('families').select('id, name, owner_id').eq('id', id).maybeSingle().then(ok),
-    supabase.from('family_members').select('user_id, joined_at, profiles(name)').eq('family_id', id).order('joined_at').then(ok),
-    supabase.from('family_invites').select('email').eq('family_id', id).order('created_at').then(ok),
-    supabase.from('pending_users').select('username, name').eq('family_id', id).order('created_at').then(ok),
     supabase.rpc('family_access_code', { fam: id }).then(ok), // null unless I'm the admin
   ]);
   if (!fam) return section('<a class="back" href="#/familias">← Família</a><p class="empty">Família não encontrada.</p>');
   const owner = fam.owner_id === me.id;
+  if (!owner) people.status = 'active';
+  const head = (table) => supabase.from(table).select('*', { count: 'exact', head: true }).eq('family_id', id).then(ok2).then((r) => r.count);
+  const [nActive, nPending, nEmail] = await Promise.all([
+    head('family_members'), owner ? head('pending_users') : 0, owner ? head('family_invites') : 0,
+  ]);
   const link = location.origin + location.pathname + '#/criar-conta';
   const inviteText = (p) => `Oi, ${p.name}! 🎄 Entre na família "${fam.name}" no Me Dá Mimo:\n`
     + `${location.origin + location.pathname}#/primeiro-acesso/${p.username}\nUsuário: ${p.username}\nCódigo: ${code}`;
-  const nameOf = (m) => m.profiles?.name ?? 'Alguém';
+  const segBtn = (v, label, n) => `<button class="btn small" data-act="pstatus" data-id="${v}" aria-pressed="${people.status === v}">${label} <span class="chip">${n}</span></button>`;
 
   const el = section(`
     <a class="back" href="#/familias">← Família</a>
     <h2>${esc(fam.name)}</h2>
-    <div class="panel">
-      <h3>Membros <span class="chip">${members.length}</span></h3>
-      <ul class="list">${members.map((m) => `
-        <li class="item member">
-          <span class="tile initial" aria-hidden="true">${initial(nameOf(m))}</span>
-          <a class="item-title" href="${m.user_id === me.id ? '#/' : '#/pessoa/' + esc(m.user_id)}">${esc(nameOf(m))}${m.user_id === me.id ? ' (você)' : ''}</a>
-          ${m.user_id === fam.owner_id ? '<span class="tag admin">Admin</span>'
-            : `<span class="tag">Membro</span>${owner ? `<button class="btn small danger" data-act="remove" data-id="${esc(m.user_id)}">Remover</button>` : ''}`}
-        </li>`).join('')}</ul>
-    </div>
+    <section class="block" aria-labelledby="h-people">
+      <div class="head"><h2 id="h-people">Pessoas</h2></div>
+      <div class="filters" role="group" aria-label="Filtrar pessoas">
+        ${owner ? `<div class="seg" role="group" aria-label="Mostrar">
+          ${segBtn('active', 'Ativas', nActive)}${segBtn('pending', 'Aguardando', nPending)}${nEmail ? segBtn('email', 'Por e-mail', nEmail) : ''}
+        </div>` : ''}
+        <label class="inline grow">Procurar
+          <input id="p-q" type="search" value="${esc(people.q)}" placeholder="Nome ou usuário" autocomplete="off" enterkeyhint="search">
+        </label>
+      </div>
+      <div id="people" aria-live="polite"></div>
+    </section>
     ${owner ? `
       <section class="block" aria-labelledby="h-add">
         <h2 id="h-add">Adicionar pessoa</h2>
@@ -683,16 +693,6 @@ async function family(id) {
           <p id="u-hint" class="small hint" aria-live="polite">Letras minúsculas, números, ponto ou _ (3 a 30).</p>
           <button type="submit" class="btn primary">Criar usuário</button>
         </form>
-        ${pending.length ? `<h3>Ainda não fizeram o primeiro acesso <span class="chip">${pending.length}</span></h3>
-        <ul class="list">${pending.map((p) => `
-          <li class="item wrap">
-            <span class="tile initial" aria-hidden="true">${initial(p.name)}</span>
-            <span class="item-title">${esc(p.name)}<small>${esc(p.username)}</small></span>
-            <div class="actions">
-              <button class="btn small primary" data-act="sendInvite" data-id="${esc(p.username)}">Enviar convite</button>
-              <button class="btn small danger" data-act="unpend" data-id="${esc(p.username)}">Cancelar</button>
-            </div>
-          </li>`).join('')}</ul>` : ''}
         <details class="card by-email">
           <summary>Prefere convidar por e-mail?</summary>
           <form id="f-add" class="stack">
@@ -702,9 +702,6 @@ async function family(id) {
             </label>
             <button type="submit" class="btn primary">Adicionar por e-mail</button>
           </form>
-          ${invites.length ? `<ul class="list">${invites.map((i) => `
-            <li class="item">${tile('mail')}<span class="item-title">${esc(i.email)}</span>
-              <button class="btn small danger" data-act="uninvite" data-id="${esc(i.email)}">Cancelar</button></li>`).join('')}</ul>` : ''}
         </details>
         <div class="card stack code-card">
           <h3>Código da família</h3>
@@ -718,6 +715,62 @@ async function family(id) {
       </section>
       <p class="end"><button class="btn danger" data-act="destroy">Apagar família</button></p>`
     : '<p class="end"><button class="btn danger" data-act="leave">Sair da família</button></p>'}`);
+
+  // Server-side filter + page, like "Presentes para dar".
+  const box = $('#people', el);
+  const loadPeople = async () => {
+    const token = (box.token = (box.token ?? 0) + 1);
+    const t = people.q && orTerm(people.q);
+    let q, render1;
+    if (people.status === 'pending') {
+      q = supabase.from('pending_users').select('username, name', { count: 'exact' }).eq('family_id', id);
+      if (t) q = q.or(`name.ilike.${t},username.ilike.${t}`);
+      q = q.order('created_at', { ascending: false });
+      render1 = (p) => `
+        <li class="item wrap">
+          <span class="tile initial" aria-hidden="true">${initial(p.name)}</span>
+          <span class="item-title">${esc(p.name)}<small>${esc(p.username)} · ainda não entrou</small></span>
+          <div class="actions">
+            <button class="btn small primary" data-act="sendInvite" data-id="${esc(p.username)}" data-name="${esc(p.name)}">Enviar convite</button>
+            <button class="btn small danger" data-act="unpend" data-id="${esc(p.username)}">Cancelar</button>
+          </div>
+        </li>`;
+    } else if (people.status === 'email') {
+      q = supabase.from('family_invites').select('email', { count: 'exact' }).eq('family_id', id);
+      if (t) q = q.ilike('email', t);
+      q = q.order('created_at', { ascending: false });
+      render1 = (i) => `
+        <li class="item">${tile('mail')}<span class="item-title">${esc(i.email)}<small>espera criar a conta</small></span>
+          <button class="btn small danger" data-act="uninvite" data-id="${esc(i.email)}">Cancelar</button></li>`;
+    } else {
+      q = supabase.from('family_members').select('user_id, joined_at, profiles!inner(name, username)', { count: 'exact' }).eq('family_id', id);
+      if (t) q = q.or(`name.ilike.${t},username.ilike.${t}`, { referencedTable: 'profiles' });
+      q = q.order('joined_at');
+      render1 = (m) => {
+        const name = m.profiles?.name ?? 'Alguém';
+        const mine = m.user_id === me.id;
+        return `
+        <li class="item${owner && m.user_id !== fam.owner_id ? ' wrap' : ''}">
+          <span class="tile initial" aria-hidden="true">${initial(name)}</span>
+          <span class="item-title"><a href="${mine ? '#/' : '#/pessoa/' + esc(m.user_id)}">${esc(name)}${mine ? ' (você)' : ''}</a>${m.profiles?.username ? `<small>${esc(m.profiles.username)}</small>` : ''}</span>
+          ${m.user_id === fam.owner_id ? '<span class="tag admin">Admin</span>' : '<span class="tag">Membro</span>'}
+          ${owner && m.user_id !== fam.owner_id ? `<div class="actions"><button class="btn small danger" data-act="remove" data-id="${esc(m.user_id)}" data-name="${esc(name)}">Remover</button></div>` : ''}
+        </li>`;
+      };
+    }
+    const { data: rows, count } = ok2(await q.range(0, people.limit - 1));
+    if (token !== box.token) return; // a newer search already answered
+    box.innerHTML = rows.length
+      ? `<ul class="list">${rows.map(render1).join('')}</ul>${moreButton('morePeople', rows.length, count)}`
+      : emptyState('users', people.q ? 'Ninguém encontrado' : people.status === 'pending' ? 'Todo mundo já entrou 🎉' : 'Ninguém por aqui',
+        people.q ? 'Tente outro nome ou usuário.' : people.status === 'pending' ? 'Quem você criar aparece aqui até fazer o primeiro acesso.' : 'Adicione pessoas logo abaixo.');
+  };
+  let typing;
+  $('#p-q', el).oninput = (e) => {
+    clearTimeout(typing);
+    typing = setTimeout(() => { people.q = e.target.value.trim(); people.limit = PAGE; loadPeople().catch((err) => toast(friendly(err))); }, 300);
+  };
+  await loadPeople();
 
   const userForm = $('#f-user', el);
   if (userForm) {
@@ -745,6 +798,8 @@ async function family(id) {
     username.oninput = () => { edited = !!username.value; check(); };
     userForm.onsubmit = submit(userForm, async (f) => {
       const u = ok(await supabase.rpc('create_family_user', { fam: id, u: f.username, member_name: f.name }));
+      people.status = 'pending'; // show the new person in "Aguardando"
+      people.q = '';
       await render(); // the list shows the new person before the invite opens
       shareInvite(inviteText({ name: f.name.trim(), username: u }));
     });
@@ -758,8 +813,15 @@ async function family(id) {
   });
 
   on(el, {
+    pstatus: (v) => {
+      people.status = v;
+      people.limit = PAGE;
+      for (const b of el.querySelectorAll('[data-act=pstatus]')) b.setAttribute('aria-pressed', b.dataset.id === v);
+      return loadPeople();
+    },
+    morePeople: () => { people.limit += PAGE; return loadPeople(); },
     copyCode: async (_, btn) => flash(btn, await copyText(code) ? 'Copiado ✔' : code),
-    sendInvite: (u) => shareInvite(inviteText(pending.find((p) => p.username === u))),
+    sendInvite: (u, btn) => shareInvite(inviteText({ username: u, name: btn.dataset.name })),
     unpend: async (u) => {
       if (!await ask(`Cancelar o usuário ${u}? O convite dele para de funcionar.`, 'Cancelar usuário')) return;
       ok(await supabase.from('pending_users').delete().eq('username', u));
@@ -775,8 +837,8 @@ async function family(id) {
       ok(await supabase.from('family_invites').delete().eq('family_id', id).eq('email', email));
       render();
     },
-    remove: async (uid) => {
-      if (!await ask(`Remover ${nameOf(members.find((m) => m.user_id === uid))} da família?`, 'Remover')) return;
+    remove: async (uid, btn) => {
+      if (!await ask(`Remover ${btn.dataset.name} da família?`, 'Remover')) return;
       ok(await supabase.from('family_members').delete().eq('family_id', id).eq('user_id', uid));
       render();
     },
