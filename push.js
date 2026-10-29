@@ -1,6 +1,12 @@
 // Web Push no cliente: SW + assinatura salva em push_subscriptions.
 export async function registerSW() {
-  if ('serviceWorker' in navigator) return navigator.serviceWorker.register('./sw.js', { scope: './' });
+  if (!('serviceWorker' in navigator)) return;
+  // A new version took over (skipWaiting + claim): reload once so the screen uses it now.
+  // Skipped on the very first install, when there was no previous worker.
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true });
+  }
+  return navigator.serviceWorker.register('./sw.js', { scope: './' });
 }
 
 export const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) ||
