@@ -610,3 +610,20 @@ input.code { font-size: 1.4rem; letter-spacing: .3em; text-transform: uppercase;
 .by-email summary { cursor: pointer; font-weight: 700; color: var(--plum); }
 .by-email[open] summary { margin-bottom: .85rem; }
 .by-email .list { margin: 1rem 0 0; }
+
+/* loading state on any busy button */
+.btn[aria-busy="true"] { position: relative; color: transparent !important; pointer-events: none; }
+.btn[aria-busy="true"]::after {
+  content: ""; position: absolute; inset: 0; margin: auto; width: 18px; height: 18px;
+  border: 2.5px solid currentColor; border-radius: 50%; border-color: var(--plum) transparent var(--plum) transparent;
+  animation: spin .7s linear infinite;
+}
+.btn.primary[aria-busy="true"]::after, .btn.dark[aria-busy="true"]::after { border-color: #fff transparent #fff transparent; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .btn[aria-busy="true"]::after { animation-duration: 2s; } }
+
+/* in-app dialogs */
+.ask-text { font-size: 1.05rem; font-weight: 600; color: var(--plum); }
+#invite-text { width: 100%; font: inherit; font-size: .95rem; resize: none; }
+.invite-actions { display: flex; flex-direction: column; gap: .5rem; }
+.invite-actions .btn { width: 100%; justify-content: center; }

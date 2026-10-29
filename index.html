@@ -55,6 +55,30 @@
     </form>
   </dialog>
 
+  <dialog id="ask-dialog" aria-labelledby="ask-text">
+    <form method="dialog" class="stack">
+      <p id="ask-text" class="ask-text"></p>
+      <div class="actions">
+        <button value="no" class="btn">Cancelar</button>
+        <button value="yes" class="btn primary" id="ask-ok">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="invite-dialog" aria-labelledby="invite-title">
+    <div class="stack">
+      <h2 id="invite-title">Convite pronto 🎄</h2>
+      <p class="muted small">Mande esta mensagem para a pessoa. Ela leva o link, o usuário e o código.</p>
+      <textarea id="invite-text" rows="6" readonly></textarea>
+      <div class="invite-actions">
+        <a class="btn primary" id="invite-wa" target="_blank" rel="noopener">Enviar no WhatsApp</a>
+        <button type="button" class="btn" id="invite-copy">Copiar convite</button>
+        <button type="button" class="btn" id="invite-share" hidden>Outros apps</button>
+      </div>
+      <div class="actions"><button type="button" class="btn link" id="invite-close">Fechar</button></div>
+    </div>
+  </dialog>
+
   <div id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

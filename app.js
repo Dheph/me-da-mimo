@@ -48,15 +48,46 @@ function ok({ data, error }) {
 }
 
 async function busy(btn, fn) {
+  btn?.setAttribute('aria-busy', 'true'); // spinner via CSS
   if (btn) btn.disabled = true;
-  try { await fn(); } catch (e) { toast(friendly(e)); } finally { if (btn) btn.disabled = false; }
+  try { await fn(); } catch (e) { toast(friendly(e)); } finally {
+    if (btn) { btn.disabled = false; btn.removeAttribute('aria-busy'); }
+  }
+}
+
+// In-app confirm: native confirm()/prompt() are blocked in some installed apps and webviews.
+function ask(text, okLabel = 'Confirmar') {
+  const dlg = $('#ask-dialog');
+  $('#ask-text').textContent = text;
+  $('#ask-ok').textContent = okLabel;
+  dlg.returnValue = '';
+  dlg.showModal();
+  return new Promise((resolve) => dlg.addEventListener('close', () => resolve(dlg.returnValue === 'yes'), { once: true }));
+}
+
+// Copies text; falls back to selecting a field so the person can copy by hand.
+async function copyText(text, field) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    field?.select();
+    try { return document.execCommand('copy'); } catch { return false; }
+  }
+}
+
+// Flashes a label on a button for a moment (toasts sit under modal dialogs).
+function flash(btn, label) {
+  const old = btn.textContent;
+  btn.textContent = label;
+  setTimeout(() => { btn.textContent = old; }, 2000);
 }
 
 // Click delegation: <button data-act="name" data-id="…"> calls actions.name(id).
 function on(el, actions) {
   el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (b && actions[b.dataset.act]) busy(b, () => actions[b.dataset.act](b.dataset.id));
+    if (b && actions[b.dataset.act]) busy(b, () => actions[b.dataset.act](b.dataset.id, b));
   });
 }
 
@@ -529,7 +560,7 @@ async function home() {
     edit: (id) => giftDialog(mineBox.rows.find((g) => g.id === id)),
     del: async (id) => {
       const g = mineBox.rows.find((x) => x.id === id);
-      if (!confirm(`Apagar o pedido "${g.title}"?`)) return;
+      if (!await ask(`Apagar o pedido "${g.title}"?`, 'Apagar')) return;
       ok(await supabase.from('gifts').delete().eq('id', id));
       render();
     },
@@ -595,17 +626,18 @@ async function families() {
   return el;
 }
 
-// Phone: native share sheet (WhatsApp etc.). Elsewhere: clipboard, so the admin can paste it.
-async function shareInvite(text) {
-  if (navigator.share) {
-    try { return await navigator.share({ text }); } catch (e) { if (e.name === 'AbortError') return; }
-  }
-  try {
-    await navigator.clipboard.writeText(text);
-    toast('Convite copiado! Cole no WhatsApp da pessoa.');
-  } catch {
-    prompt('Copie o convite:', text);
-  }
+// Opens the invite with explicit buttons: share/copy need a fresh tap, not the end of an await.
+function shareInvite(text) {
+  const dlg = $('#invite-dialog');
+  const field = $('#invite-text');
+  field.value = text;
+  $('#invite-wa').href = 'https://wa.me/?text=' + encodeURIComponent(text);
+  const share = $('#invite-share');
+  share.hidden = !navigator.share;
+  share.onclick = () => navigator.share({ text }).catch(() => {});
+  $('#invite-copy').onclick = async (e) => flash(e.currentTarget, await copyText(text, field) ? 'Copiado ✔' : 'Selecione e copie');
+  $('#invite-close').onclick = () => dlg.close();
+  dlg.showModal();
 }
 
 async function family(id) {
@@ -639,11 +671,6 @@ async function family(id) {
     ${owner ? `
       <section class="block" aria-labelledby="h-add">
         <h2 id="h-add">Adicionar pessoa</h2>
-        <div class="card stack code-card">
-          <span class="muted small">Código da família (vai junto no convite)</span>
-          <strong class="code-big">${esc(code)}</strong>
-          <button class="btn small" data-act="renew">Gerar código novo</button>
-        </div>
         <form id="f-user" class="card stack">
           <h3>Criar usuário</h3>
           <p class="muted small">Crie o usuário e mande o convite. No primeiro acesso a pessoa usa o usuário + o código e cria a própria senha.</p>
@@ -679,6 +706,15 @@ async function family(id) {
             <li class="item">${tile('mail')}<span class="item-title">${esc(i.email)}</span>
               <button class="btn small danger" data-act="uninvite" data-id="${esc(i.email)}">Cancelar</button></li>`).join('')}</ul>` : ''}
         </details>
+        <div class="card stack code-card">
+          <h3>Código da família</h3>
+          <p class="muted small">Vai junto no convite. Vale para o primeiro acesso de quem foi criado nesta família.</p>
+          <strong class="code-big" aria-label="Código ${esc(code.split('').join(' '))}">${esc(code)}</strong>
+          <div class="actions">
+            <button class="btn small" data-act="copyCode">Copiar código</button>
+            <button class="btn small danger" data-act="renew">Gerar código novo</button>
+          </div>
+        </div>
       </section>
       <p class="end"><button class="btn danger" data-act="destroy">Apagar família</button></p>`
     : '<p class="end"><button class="btn danger" data-act="leave">Sair da família</button></p>'}`);
@@ -709,8 +745,8 @@ async function family(id) {
     username.oninput = () => { edited = !!username.value; check(); };
     userForm.onsubmit = submit(userForm, async (f) => {
       const u = ok(await supabase.rpc('create_family_user', { fam: id, u: f.username, member_name: f.name }));
-      await shareInvite(inviteText({ name: f.name.trim(), username: u }));
-      render();
+      await render(); // the list shows the new person before the invite opens
+      shareInvite(inviteText({ name: f.name.trim(), username: u }));
     });
   }
 
@@ -722,34 +758,35 @@ async function family(id) {
   });
 
   on(el, {
+    copyCode: async (_, btn) => flash(btn, await copyText(code) ? 'Copiado ✔' : code),
     sendInvite: (u) => shareInvite(inviteText(pending.find((p) => p.username === u))),
     unpend: async (u) => {
-      if (!confirm(`Cancelar o usuário ${u}?`)) return;
+      if (!await ask(`Cancelar o usuário ${u}? O convite dele para de funcionar.`, 'Cancelar usuário')) return;
       ok(await supabase.from('pending_users').delete().eq('username', u));
       render();
     },
     renew: async () => {
-      if (!confirm('Gerar um código novo? O código antigo para de funcionar para quem ainda não fez o primeiro acesso.')) return;
+      if (!await ask('Gerar um código novo? O código atual para de valer. Quem ainda não fez o primeiro acesso entra com o código novo: reenvie o convite.', 'Gerar código novo')) return;
       ok(await supabase.rpc('renew_access_code', { fam: id }));
+      await render();
       toast('Código novo gerado. Reenvie o convite para quem ainda não entrou.');
-      render();
     },
     uninvite: async (email) => {
       ok(await supabase.from('family_invites').delete().eq('family_id', id).eq('email', email));
       render();
     },
     remove: async (uid) => {
-      if (!confirm(`Remover ${nameOf(members.find((m) => m.user_id === uid))} da família?`)) return;
+      if (!await ask(`Remover ${nameOf(members.find((m) => m.user_id === uid))} da família?`, 'Remover')) return;
       ok(await supabase.from('family_members').delete().eq('family_id', id).eq('user_id', uid));
       render();
     },
     destroy: async () => {
-      if (!confirm(`Apagar a família "${fam.name}"? Isso não pode ser desfeito.`)) return;
+      if (!await ask(`Apagar a família "${fam.name}"? Isso não pode ser desfeito.`, 'Apagar família')) return;
       ok(await supabase.from('families').delete().eq('id', id));
       go('#/familias');
     },
     leave: async () => {
-      if (!confirm(`Sair da família "${fam.name}"?`)) return;
+      if (!await ask(`Sair da família "${fam.name}"?`, 'Sair')) return;
       ok(await supabase.from('family_members').delete().eq('family_id', id).eq('user_id', me.id));
       go('#/familias');
     },

@@ -1,5 +1,5 @@
 // Service worker: push + shell offline (network-first, só mesma origem).
-const CACHE = 'mimo-v5';
+const CACHE = 'mimo-v6';
 const SHELL = ['./', './index.html', './app.js', './style.css', './supabase.js', './push.js', './install.js', './config.js',
   './manifest.webmanifest', './icons/icon-192.png'];
 
