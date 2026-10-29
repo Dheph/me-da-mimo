@@ -18,13 +18,16 @@
 ## Como funciona
 
 1. **Quem organiza cria a família.** Em "Criar conta", escolha *Admin da família* e dê um nome a ela.
-2. **O admin adiciona as pessoas pelo e-mail.** Quem já tem conta entra na hora. Quem ainda não tem
-   entra sozinho ao criar a conta com aquele e-mail, escolhendo *Membro da família*.
-3. **Cada um faz os seus pedidos.** Toque em **Adicionar meu pedido** e diga o que quer ganhar, com o
-   link da loja e detalhes como tamanho e cor.
-4. **A família fica sabendo.** Todo pedido novo gera um aviso para os outros membros.
-5. **Comprou? Marque "Comprei este".** O presente sai da lista de quem vai dar. Quem vai ganhar recebe
-   o aviso de que alguém comprou, mas nunca sabe quem foi.
+2. **O admin cria um usuário para cada pessoa** (ex.: `renan.lag`) e toca em **Enviar convite**. A
+   mensagem já vai com o link, o usuário e o **código da família**, pronta para o WhatsApp.
+3. **No primeiro acesso, a pessoa usa usuário + código e cria a própria senha.** Depois entra com
+   usuário e senha. Se quiser, cadastra um e-mail no Perfil para entrar com ele também.
+4. **Cada um faz os seus pedidos.** Toque em **Adicionar meu pedido** e diga o que quer ganhar, com o
+   link da loja e detalhes como tamanho e cor. A família recebe um aviso.
+5. **Comprou? Marque "Comprei este".** O presente sai da lista dos outros, para ninguém comprar
+   repetido. **Quem vai ganhar não fica sabendo de nada**: nem que foi comprado, nem por quem.
+
+Prefere e-mail? O admin também pode adicionar pessoas pelo e-mail, e elas criam a conta sozinhas.
 
 Tudo fica numa tela só: o botão de pedir, a sua família, os **presentes para dar** (com busca, filtro
 por pessoa e "que eu comprei") e os **seus pedidos**.
@@ -39,7 +42,7 @@ por pessoa e "que eu comprei") e os **seus pedidos**.
 | | Admin | Membro |
 |---|:---:|:---:|
 | Faz os próprios pedidos e compra presentes | ✅ | ✅ |
-| Adiciona e remove pessoas da família | ✅ | — |
+| Cria usuários, gera o código e remove pessoas | ✅ | — |
 | Sai da família | — | ✅ |
 
 O admin também é membro: tem a própria lista e ganha presente como todo mundo. A mesma pessoa pode

@@ -123,8 +123,9 @@ async function render(focus = false) {
   const token = ++seq;
   const hash = location.hash;
   nav.hidden = !user;
-  if (!user) return show(hash === '#/entrar' ? login(false) : hash === '#/criar-conta' ? login(true) : landing(), focus);
-  if (hash === '#/entrar' || hash === '#/criar-conta') return go('#/');
+  const first = hash.match(/^#\/primeiro-acesso(?:\/([\w.]+))?$/);
+  if (!user) return show(first ? firstAccess(first[1]) : hash === '#/entrar' ? login(false) : hash === '#/criar-conta' ? login(true) : landing(), focus);
+  if (first || hash === '#/entrar' || hash === '#/criar-conta') return go('#/');
 
   const route = routes.find(([re]) => re.test(hash));
   if (!route) return go('#/');
@@ -167,18 +168,19 @@ function landing() {
       <div class="hero">
         <div class="hero-copy">
           <h2>Natal sem presente repetido e sem “o que você quer ganhar?”</h2>
-          <p class="lead">Cada pessoa da família monta sua lista de mimos. Quem vai presentear escolhe um, marca que comprou, e a surpresa continua guardada até a noite de Natal.</p>
+          <p class="lead">Cada pessoa da família monta sua lista de mimos. Quem vai presentear escolhe um e marca que comprou. Quem vai ganhar não fica sabendo de nada até a noite de Natal.</p>
           <div class="actions">
             <a class="btn primary big" href="#/criar-conta">Criar minha família</a>
             <a class="btn big" href="#/entrar">Já tenho conta</a>
           </div>
+          <p class="first-link">Recebeu um usuário e um código da família? <a href="#/primeiro-acesso">Faça o primeiro acesso</a></p>
           <p class="muted small">É grátis e funciona direto no navegador do celular.</p>
         </div>
         <div class="hero-art" aria-hidden="true">
           <img src="icons/logo.png" alt="" width="148" height="148">
           <div class="mock">
             <div class="mock-item">${tile('gift')}<span><strong>Livro de receitas</strong><small>Capa dura, se tiver</small></span></div>
-            <div class="mock-item">${tile('bag')}<span><strong>Pantufa quentinha</strong><small class="seal">Alguém já comprou 🎉</small></span></div>
+            <div class="mock-item">${tile('bag')}<span><strong>Pantufa quentinha</strong><small class="seal">Você comprou ✔</small></span></div>
           </div>
         </div>
       </div>
@@ -186,10 +188,10 @@ function landing() {
       <section class="panel how" aria-labelledby="how-title">
         <h2 id="how-title">Como funciona</h2>
         <ol class="steps">
-          <li>${tile('users')}<div><h3>O admin cria a família</h3><p>Quem organiza o Natal cria a família e adiciona cada pessoa pelo e-mail.</p></div></li>
+          <li>${tile('users')}<div><h3>O admin cria a família</h3><p>Quem organiza o Natal cria a família e um usuário para cada pessoa. Manda o convite pelo WhatsApp e pronto.</p></div></li>
           <li>${tile('list')}<div><h3>Cada um monta sua lista</h3><p>Coloque o que você quer ganhar, com o link da loja e detalhes como tamanho, cor ou modelo.</p></div></li>
-          <li>${tile('bell')}<div><h3>A família fica sabendo</h3><p>Entrou presente novo numa lista? Todo mundo da família recebe um alerta.</p></div></li>
-          <li>${tile('check')}<div><h3>Comprou, marcou “Comprei”</h3><p>O presenteado recebe o aviso de que alguém comprou, sem saber quem foi. A surpresa fica guardada.</p></div></li>
+          <li>${tile('bell')}<div><h3>A família fica sabendo</h3><p>Entrou pedido novo numa lista? Todo mundo da família recebe um alerta.</p></div></li>
+          <li>${tile('check')}<div><h3>Comprou, marcou “Comprei”</h3><p>O presente sai da lista dos outros, para ninguém comprar repetido. Quem vai ganhar não fica sabendo de nada.</p></div></li>
         </ol>
       </section>
 
@@ -197,7 +199,7 @@ function landing() {
         <h2 id="roles-title">Um organiza, todo mundo participa</h2>
         <div class="duo">
           <div class="card">${tile('crown')}<h3>Admin da família</h3><p>Cria a família, adiciona e remove pessoas. E também é membro: tem a própria lista e ganha presente como todo mundo.</p></div>
-          <div class="card">${tile('mail')}<h3>Membro</h3><p>Não precisa configurar nada. Crie sua conta com o mesmo e-mail que o admin cadastrou e você já entra na família.</p></div>
+          <div class="card">${tile('mail')}<h3>Membro</h3><p>Não precisa configurar nada. O admin manda um usuário e um código; no primeiro acesso você só cria a sua senha.</p></div>
         </div>
       </section>
 
@@ -205,9 +207,9 @@ function landing() {
         <h2 id="perks-title">Feito para o Natal em família</h2>
         <ul class="perks">
           <li>${tile('repeat')}<div><h3>Sem presente repetido</h3><p>Quando alguém marca que comprou, o resto da família já vê que aquele item foi.</p></div></li>
-          <li>${tile('lock')}<div><h3>Segredo garantido</h3><p>Você fica sabendo que ganhou algo da sua lista, nunca quem comprou.</p></div></li>
+          <li>${tile('lock')}<div><h3>Surpresa de verdade</h3><p>Você nunca vê se alguém já comprou um pedido seu, nem quem foi. Só descobre no Natal.</p></div></li>
           <li>${tile('phone')}<div><h3>Funciona como app</h3><p>Abra no celular e adicione à tela inicial. Sem baixar nada da loja.</p></div></li>
-          <li>${tile('bell')}<div><h3>Avisos na hora</h3><p>Receba notificação quando entrar presente novo ou alguém comprar um mimo seu.</p></div></li>
+          <li>${tile('bell')}<div><h3>Avisos na hora</h3><p>Receba notificação quando alguém da família fizer um pedido novo.</p></div></li>
         </ul>
       </section>
 
@@ -215,7 +217,7 @@ function landing() {
         <h2 id="faq-title">Perguntas frequentes</h2>
         <div class="stack">
           <details><summary>É grátis?</summary><p>Sim. É só criar a conta e começar a montar a lista.</p></details>
-          <details><summary>Quem vê quem comprou cada presente?</summary><p>O resto da família vê, para ninguém comprar a mesma coisa. Quem vai ganhar só vê o selo “Alguém já comprou”, sem o nome.</p></details>
+          <details><summary>Quem vê quem comprou cada presente?</summary><p>O resto da família vê, para ninguém comprar a mesma coisa. Quem vai ganhar não vê nada: nem que foi comprado, nem por quem.</p></details>
           <details><summary>Preciso instalar alguma coisa?</summary><p>Não. Funciona no navegador. Se quiser, adicione à tela inicial para abrir como um app.</p></details>
           <details><summary>Uso iPhone. Recebo as notificações?</summary><p>Sim, no iOS 16.4 ou mais novo. No Safari, toque em Compartilhar → Adicionar à Tela de Início, abra o Me Dá Mimo pelo ícone e ative as notificações no Perfil.</p></details>
         </div>
@@ -228,6 +230,65 @@ function landing() {
 
       <footer class="foot">© 2026 Me Dá Mimo · Feito com carinho para o Natal em família</footer>
     </div>`);
+}
+
+// Admin-created accounts log in by username; their auth e-mail lives on a reserved, never-mailed domain.
+const USER_DOMAIN = 'me-da-mimo.invalid';
+async function loginEmail(id) {
+  id = id.trim().toLowerCase();
+  if (!id.includes('@')) return `${id}@${USER_DOMAIN}`;
+  const { data } = await supabase.rpc('login_email_for', { e: id }); // optional e-mail of a username account
+  return data || id;
+}
+
+// First access: username + family code, then the person creates a password.
+function firstAccess(prefill = '') {
+  const el = section(`
+    <div class="auth">
+    <h2>Primeiro acesso</h2>
+    <p class="muted">Use o usuário e o código que a sua família mandou.</p>
+    <form id="f-code" class="card stack">
+      <label>Usuário
+        <input name="username" required autocomplete="username" autocapitalize="none" spellcheck="false" value="${esc(prefill)}" placeholder="Ex.: renan.lag">
+      </label>
+      <label>Código
+        <input name="code" required maxlength="6" autocapitalize="characters" autocomplete="one-time-code" spellcheck="false" placeholder="Ex.: K7P2QX" class="code">
+      </label>
+      <button type="submit" class="btn primary big">Continuar</button>
+    </form>
+    <form id="f-pass" class="card stack" hidden>
+      <p class="banner" id="welcome"></p>
+      <label>Crie uma senha
+        <input name="password" type="password" required minlength="6" autocomplete="new-password">
+      </label>
+      <label>Repita a senha
+        <input name="again" type="password" required minlength="6" autocomplete="new-password">
+      </label>
+      <p class="muted small">Daqui pra frente você entra com o seu usuário e essa senha.</p>
+      <button type="submit" class="btn primary big">Criar senha e entrar</button>
+    </form>
+    <p class="muted switch">Já criou sua senha? <a href="#/entrar">Entrar</a></p>
+    </div>`);
+  const fCode = $('#f-code', el);
+  const fPass = $('#f-pass', el);
+  let creds;
+  fCode.onsubmit = submit(fCode, async (f) => {
+    const check = ok(await supabase.rpc('claim_check', { u: f.username, code: f.code }));
+    if (!check.ok) throw new Error(check.error);
+    creds = { username: f.username.trim().toLowerCase(), code: f.code.trim() };
+    $('#welcome', el).textContent = `Oi, ${check.name}! Você vai entrar na família ${check.family} 🎄`;
+    fCode.hidden = true;
+    fPass.hidden = false;
+    fPass.elements.password.focus();
+  });
+  fPass.onsubmit = submit(fPass, async (f) => {
+    if (f.password !== f.again) throw new Error('As duas senhas estão diferentes.');
+    const { data, error } = await supabase.functions.invoke('claim-user', { body: { ...creds, password: f.password } });
+    if (error) throw new Error((await error.context?.json?.().catch(() => null))?.error ?? 'Não deu certo agora. Tente de novo.');
+    // Success fires onAuthStateChange, which renders the app.
+    ok(await supabase.auth.signInWithPassword({ email: data.email, password: f.password }));
+  });
+  return el;
 }
 
 function login(signup) {
@@ -250,15 +311,17 @@ function login(signup) {
       <label>Seu nome
         <input name="name" required maxlength="60" pattern=".*\\S.*" autocomplete="name">
       </label>` : ''}
-      <label>E-mail
+      ${signup ? `<label>E-mail
         <input name="email" type="email" required autocomplete="email" inputmode="email">
-      </label>
+      </label>` : `<label>Usuário ou e-mail
+        <input name="email" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Ex.: renan.lag">
+      </label>`}
       <label>Senha
         <input name="password" type="password" required minlength="6" autocomplete="${signup ? 'new-password' : 'current-password'}">
       </label>
       <button type="submit" class="btn primary big">${signup ? 'Criar conta' : 'Entrar'}</button>
     </form>
-    <p class="muted switch">${signup ? 'Já tem conta? <a href="#/entrar">Entrar</a>' : 'Primeira vez? <a href="#/criar-conta">Criar conta</a>'}</p>
+    <p class="muted switch">${signup ? 'Já tem conta? <a href="#/entrar">Entrar</a>' : 'Recebeu usuário e código? <a href="#/primeiro-acesso">Primeiro acesso</a><br>Vai organizar a família? <a href="#/criar-conta">Criar conta</a>'}</p>
     </div>`);
   const form = $('#f-auth', el);
   if (signup) {
@@ -272,7 +335,7 @@ function login(signup) {
   // Success fires onAuthStateChange, which renders the app.
   form.onsubmit = submit(form, async (f) => {
     const email = f.email.trim();
-    if (!signup) return ok(await supabase.auth.signInWithPassword({ email, password: f.password }));
+    if (!signup) return ok(await supabase.auth.signInWithPassword({ email: await loginEmail(email), password: f.password }));
     // The DB trigger creates the family (admin) or joins the inviting ones (member).
     const meta = { name: f.name.trim(), ...(f.role === 'admin' && { family_name: f.family.trim() }) };
     const data = ok(await supabase.auth.signUp({ email, password: f.password, options: { data: meta } }));
@@ -290,7 +353,7 @@ async function purchasesOf(gifts) {
 
 function buyStatus(g, buyOf) {
   const b = buyOf[g.id];
-  if (!b && !g.purchased) return `<button class="btn primary" data-act="buy" data-id="${esc(g.id)}">${ico('check')} Comprei este</button>`;
+  if (!b) return `<button class="btn primary" data-act="buy" data-id="${esc(g.id)}">${ico('check')} Comprei este</button>`;
   if (b?.buyer_id === me.id) return `<span class="seal">Você comprou ✔</span><button class="btn small" data-act="undo" data-id="${esc(g.id)}">Desfazer</button>`;
   return `<span class="seal">Já comprado por ${esc(b?.profiles?.name ?? 'alguém')}</span>`;
 }
@@ -335,7 +398,6 @@ const mineItem = (g) => `
     ${tile('gift')}
     <div class="item-body">
       ${giftBody(g)}
-      ${g.purchased ? '<p class="seal">Alguém já comprou 🎉</p>' : ''}
     </div>
     <div class="actions">
       <button class="btn small" data-act="edit" data-id="${esc(g.id)}">Editar</button>
@@ -346,7 +408,7 @@ const mineItem = (g) => `
 // "Presentes para dar": server-side filter + page, so a big family never renders everything at once.
 async function loadGive(box) {
   const token = (box.token = (box.token ?? 0) + 1);
-  const cols = 'id, title, url, note, purchased, owner_id, created_at, profiles(name)';
+  const cols = 'id, title, url, note, owner_id, created_at, profiles(name)';
   let rows, count;
   if (give.status === 'mine') {
     let q = supabase.from('purchases').select(`created_at, gifts!inner(${cols})`, { count: 'exact' }).eq('buyer_id', me.id);
@@ -355,7 +417,8 @@ async function loadGive(box) {
     ({ data: rows, count } = ok2(await q.order('created_at', { ascending: false }).range(0, give.limit - 1)));
     rows = rows.map((r) => r.gifts);
   } else {
-    let q = supabase.from('gifts').select(cols, { count: 'exact' }).neq('owner_id', me.id).eq('purchased', false);
+    // Anti-join: only gifts nobody bought yet. Owners never reach this (it's other people's gifts).
+    let q = supabase.from('gifts').select(`${cols}, purchases(gift_id)`, { count: 'exact' }).neq('owner_id', me.id).is('purchases', null);
     if (give.owner) q = q.eq('owner_id', give.owner);
     if (give.q) q = q.ilike('title', likeTerm(give.q));
     ({ data: rows, count } = ok2(await q.order('created_at', { ascending: false }).range(0, give.limit - 1)));
@@ -370,7 +433,7 @@ async function loadGive(box) {
 }
 
 async function loadMine(box) {
-  const { data: rows, count } = ok2(await supabase.from('gifts').select('id, title, url, note, purchased', { count: 'exact' })
+  const { data: rows, count } = ok2(await supabase.from('gifts').select('id, title, url, note', { count: 'exact' })
     .eq('owner_id', me.id).order('created_at', { ascending: false }).range(0, mineLimit - 1));
   box.rows = rows;
   box.innerHTML = rows.length
@@ -532,15 +595,32 @@ async function families() {
   return el;
 }
 
+// Phone: native share sheet (WhatsApp etc.). Elsewhere: clipboard, so the admin can paste it.
+async function shareInvite(text) {
+  if (navigator.share) {
+    try { return await navigator.share({ text }); } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Convite copiado! Cole no WhatsApp da pessoa.');
+  } catch {
+    prompt('Copie o convite:', text);
+  }
+}
+
 async function family(id) {
-  const [fam, members, invites] = await Promise.all([
+  const [fam, members, invites, pending, code] = await Promise.all([
     supabase.from('families').select('id, name, owner_id').eq('id', id).maybeSingle().then(ok),
     supabase.from('family_members').select('user_id, joined_at, profiles(name)').eq('family_id', id).order('joined_at').then(ok),
     supabase.from('family_invites').select('email').eq('family_id', id).order('created_at').then(ok),
+    supabase.from('pending_users').select('username, name').eq('family_id', id).order('created_at').then(ok),
+    supabase.rpc('family_access_code', { fam: id }).then(ok), // null unless I'm the admin
   ]);
   if (!fam) return section('<a class="back" href="#/familias">← Família</a><p class="empty">Família não encontrada.</p>');
   const owner = fam.owner_id === me.id;
   const link = location.origin + location.pathname + '#/criar-conta';
+  const inviteText = (p) => `Oi, ${p.name}! 🎄 Entre na família "${fam.name}" no Me Dá Mimo:\n`
+    + `${location.origin + location.pathname}#/primeiro-acesso/${p.username}\nUsuário: ${p.username}\nCódigo: ${code}`;
   const nameOf = (m) => m.profiles?.name ?? 'Alguém';
 
   const el = section(`
@@ -557,30 +637,82 @@ async function family(id) {
         </li>`).join('')}</ul>
     </div>
     ${owner ? `
-      ${invites.length ? `<h3>Aguardando criar conta <span class="chip">${invites.length}</span></h3>
-      <ul class="list">${invites.map((i) => `
-        <li class="item">${tile('mail')}<span class="item-title">${esc(i.email)}</span>
-          <button class="btn small danger" data-act="uninvite" data-id="${esc(i.email)}">Cancelar</button></li>`).join('')}</ul>` : ''}
-      <form id="f-add" class="card stack">
-        <h3>Adicionar membro</h3>
-        <p class="muted small">Se a pessoa já tem conta, entra na hora. Se não, entra assim que criar a conta com este e-mail.</p>
-        <label>E-mail da pessoa
-          <input name="email" type="email" required autocomplete="off" inputmode="email">
-        </label>
-        <button type="submit" class="btn primary">Adicionar</button>
-      </form>
-      <div class="card stack">
-        <h3>Quem ainda não tem conta</h3>
-        <label>Mande este link para criar a conta com o e-mail que você adicionou
-          <input id="invite" readonly value="${esc(link)}">
-        </label>
-        <div class="actions">
-          <button class="btn" data-act="copy">Copiar link</button>
-          ${navigator.share ? '<button class="btn primary" data-act="share">Compartilhar</button>' : ''}
+      <section class="block" aria-labelledby="h-add">
+        <h2 id="h-add">Adicionar pessoa</h2>
+        <div class="card stack code-card">
+          <span class="muted small">Código da família (vai junto no convite)</span>
+          <strong class="code-big">${esc(code)}</strong>
+          <button class="btn small" data-act="renew">Gerar código novo</button>
         </div>
-      </div>
+        <form id="f-user" class="card stack">
+          <h3>Criar usuário</h3>
+          <p class="muted small">Crie o usuário e mande o convite. No primeiro acesso a pessoa usa o usuário + o código e cria a própria senha.</p>
+          <label>Nome da pessoa
+            <input name="name" required maxlength="60" pattern=".*\\S.*" placeholder="Ex.: Renan Lage" autocomplete="off">
+          </label>
+          <label>Usuário
+            <input name="username" required maxlength="30" autocapitalize="none" spellcheck="false" autocomplete="off" placeholder="Ex.: renan.lag" aria-describedby="u-hint">
+          </label>
+          <p id="u-hint" class="small hint" aria-live="polite">Letras minúsculas, números, ponto ou _ (3 a 30).</p>
+          <button type="submit" class="btn primary">Criar usuário</button>
+        </form>
+        ${pending.length ? `<h3>Ainda não fizeram o primeiro acesso <span class="chip">${pending.length}</span></h3>
+        <ul class="list">${pending.map((p) => `
+          <li class="item">
+            <span class="tile initial" aria-hidden="true">${initial(p.name)}</span>
+            <span class="item-title">${esc(p.name)}<small>${esc(p.username)}</small></span>
+            <div class="actions">
+              <button class="btn small primary" data-act="sendInvite" data-id="${esc(p.username)}">Enviar convite</button>
+              <button class="btn small danger" data-act="unpend" data-id="${esc(p.username)}">Cancelar</button>
+            </div>
+          </li>`).join('')}</ul>` : ''}
+        <details class="card by-email">
+          <summary>Prefere convidar por e-mail?</summary>
+          <form id="f-add" class="stack">
+            <p class="muted small">Se a pessoa já tem conta, entra na hora. Se não, entra quando criar a conta com este e-mail em <strong>${esc(link)}</strong>.</p>
+            <label>E-mail da pessoa
+              <input name="email" type="email" required autocomplete="off" inputmode="email">
+            </label>
+            <button type="submit" class="btn primary">Adicionar por e-mail</button>
+          </form>
+          ${invites.length ? `<ul class="list">${invites.map((i) => `
+            <li class="item">${tile('mail')}<span class="item-title">${esc(i.email)}</span>
+              <button class="btn small danger" data-act="uninvite" data-id="${esc(i.email)}">Cancelar</button></li>`).join('')}</ul>` : ''}
+        </details>
+      </section>
       <p class="end"><button class="btn danger" data-act="destroy">Apagar família</button></p>`
     : '<p class="end"><button class="btn danger" data-act="leave">Sair da família</button></p>'}`);
+
+  const userForm = $('#f-user', el);
+  if (userForm) {
+    const { name, username } = userForm.elements;
+    const hint = $('#u-hint', el);
+    let edited = false, timer;
+    const check = () => {
+      clearTimeout(timer);
+      const u = username.value.trim().toLowerCase();
+      if (!u) { hint.textContent = 'Letras minúsculas, números, ponto ou _ (3 a 30).'; hint.className = 'small hint'; return; }
+      timer = setTimeout(async () => {
+        const { data } = await supabase.rpc('username_available', { u });
+        if (username.value.trim().toLowerCase() !== u) return; // typed again meanwhile
+        hint.textContent = data ? `✔ "${u}" está livre` : `✖ "${u}" já existe ou não é válido`;
+        hint.className = `small hint ${data ? 'good' : 'bad'}`;
+      }, 300);
+    };
+    // Suggests "first.last" from the name until the admin types a username.
+    name.oninput = () => {
+      if (edited) return;
+      const parts = name.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, '').trim().split(/\s+/);
+      username.value = parts.length > 1 ? `${parts[0]}.${parts.at(-1)}` : parts[0] ?? '';
+      check();
+    };
+    username.oninput = () => { edited = !!username.value; check(); };
+    userForm.onsubmit = submit(userForm, async (f) => {
+      const u = ok(await supabase.rpc('create_family_user', { fam: id, u: f.username, member_name: f.name }));
+      await shareInvite(inviteText({ name: f.name.trim(), username: u }));
+      render();
+    });
+  }
 
   const addForm = $('#f-add', el);
   if (addForm) addForm.onsubmit = submit(addForm, async (f) => {
@@ -590,6 +722,18 @@ async function family(id) {
   });
 
   on(el, {
+    sendInvite: (u) => shareInvite(inviteText(pending.find((p) => p.username === u))),
+    unpend: async (u) => {
+      if (!confirm(`Cancelar o usuário ${u}?`)) return;
+      ok(await supabase.from('pending_users').delete().eq('username', u));
+      render();
+    },
+    renew: async () => {
+      if (!confirm('Gerar um código novo? O código antigo para de funcionar para quem ainda não fez o primeiro acesso.')) return;
+      ok(await supabase.rpc('renew_access_code', { fam: id }));
+      toast('Código novo gerado. Reenvie o convite para quem ainda não entrou.');
+      render();
+    },
     uninvite: async (email) => {
       ok(await supabase.from('family_invites').delete().eq('family_id', id).eq('email', email));
       render();
@@ -598,22 +742,6 @@ async function family(id) {
       if (!confirm(`Remover ${nameOf(members.find((m) => m.user_id === uid))} da família?`)) return;
       ok(await supabase.from('family_members').delete().eq('family_id', id).eq('user_id', uid));
       render();
-    },
-    copy: async () => {
-      try {
-        await navigator.clipboard.writeText(link);
-        toast('Link copiado!');
-      } catch {
-        $('#invite', el).select();
-        toast('Selecione e copie o link.');
-      }
-    },
-    share: async () => {
-      try {
-        await navigator.share({ title: 'Me Dá Mimo', text: `Crie sua conta no Me Dá Mimo para entrar na família "${fam.name}" 🎄`, url: link });
-      } catch (e) {
-        if (e.name !== 'AbortError') throw e;
-      }
     },
     destroy: async () => {
       if (!confirm(`Apagar a família "${fam.name}"? Isso não pode ser desfeito.`)) return;
@@ -637,7 +765,7 @@ async function person(id) {
   const [p, gifts] = await Promise.all([
     supabase.from('profiles').select('name').eq('id', id).maybeSingle().then(ok),
     // shortcut: one person's list capped at 100, add paging if someone ever asks for more
-    supabase.from('gifts').select('id, title, url, note, purchased').eq('owner_id', id).order('created_at').limit(100).then(ok),
+    supabase.from('gifts').select('id, title, url, note').eq('owner_id', id).order('created_at').limit(100).then(ok),
   ]);
   if (!p) return section('<a class="back" href="#/">← Início</a><p class="empty">Pessoa não encontrada.</p>');
   const buyOf = await purchasesOf(gifts);
@@ -648,10 +776,10 @@ async function person(id) {
       <h2>Pedidos de ${esc(p.name)}</h2>
       <span class="chip">${gifts.length}</span>
     </div>
-    <p class="muted">Escolha um presente e marque “Comprei este”. ${esc(p.name)} só fica sabendo que alguém comprou, não quem.</p>
+    <p class="muted">Escolha um presente e marque “Comprei este”. ${esc(p.name)} não fica sabendo de nada.</p>
     ${gifts.length ? `<ul class="list">${gifts.map((g) => `
-      <li class="item gift${g.purchased ? ' bought' : ''}">
-        ${tile(g.purchased ? 'check' : 'gift')}
+      <li class="item gift${buyOf[g.id] ? ' bought' : ''}">
+        ${tile(buyOf[g.id] ? 'check' : 'gift')}
         <div class="item-body">${giftBody(g)}</div>
         <div class="actions">${buyStatus(g, buyOf)}</div>
       </li>`).join('')}</ul>`
@@ -682,7 +810,7 @@ async function alerts() {
           <small>${fmtDate(n.created_at)}${n.read_at ? '' : ' <span class="chip">nova</span>'}</small>
         </span>
       </button></li>`).join('')}</ul>${moreButton('more', list.length, count)}`
-    : emptyState('bell', 'Nenhum alerta por enquanto', 'Quando alguém da família adicionar um presente ou comprar um mimo seu, o aviso aparece aqui.')}`);
+    : emptyState('bell', 'Nenhum alerta por enquanto', 'Quando alguém da família fizer um pedido novo, o aviso aparece aqui.')}`);
   on(el, {
     more: () => { alertsLimit += 20; return render(); },
     open: async (id) => {
@@ -702,7 +830,7 @@ const PUSH_TEXT = {
   unsupported: 'Este navegador não suporta notificações.',
   'needs-install': 'No iPhone: toque em Compartilhar → Adicionar à Tela de Início, depois abra o app pelo ícone para ativar as notificações.',
   denied: 'As notificações estão bloqueadas. Libere nas configurações do navegador para este site.',
-  default: 'Receba um aviso quando a família adicionar presentes ou alguém comprar um mimo seu.',
+  default: 'Receba um aviso quando alguém da família fizer um pedido novo.',
 };
 
 // Permission "granted" survives unsubscribing, so check the real subscription.
@@ -721,7 +849,7 @@ const steps = (items) => `<ol class="howto">${items.map((t) => `<li><span>${t}</
 const later = '<button class="btn link" data-act="snooze">Agora não</button>';
 
 function installCard() {
-  const intro = '<h2>Coloque o Me Dá Mimo no seu celular</h2><p>Fica um ícone na tela, abre como app e <strong>avisa você</strong> quando a família pedir algo ou comprar o seu presente.</p>';
+  const intro = '<h2>Coloque o Me Dá Mimo no seu celular</h2><p>Fica um ícone na tela, abre como app e <strong>avisa você</strong> quando alguém da família fizer um pedido.</p>';
   if (inAppBrowser()) return `<div class="nudge">${intro}
     ${steps([`Toque nos três pontinhos ${ico('dots')} no canto da tela.`, 'Escolha <strong>Abrir no navegador</strong> (Chrome ou Safari).', 'Lá aparece o botão para instalar.'])}
     <div class="actions"><button class="btn primary" data-act="copyLink">Copiar o link</button>${later}</div></div>`;
@@ -756,7 +884,7 @@ async function nudge(box) {
     if (state === 'denied') html = `<div class="nudge"><h2>Os avisos estão bloqueados</h2><p>Sem eles você não fica sabendo dos pedidos da família.</p><p class="muted">${PUSH_DENIED[platform()]}</p></div>`;
     else if (state !== 'unsupported' && !(state === 'granted' && await subscribedHere())) {
       html = snoozed() ? `<button class="nudge-slim" data-act="notify">${ico('bell')}<span>Ative os avisos para saber dos pedidos</span><strong>Ativar</strong></button>`
-        : `<div class="nudge"><h2>Falta só ativar os avisos 🔔</h2><p>Assim você fica sabendo na hora quando alguém pedir algo ou comprar o seu presente.</p>
+        : `<div class="nudge"><h2>Falta só ativar os avisos 🔔</h2><p>Assim você fica sabendo na hora quando alguém da família fizer um pedido.</p>
           <div class="actions"><button class="btn primary big" data-act="notify">${ico('bell')} Ativar avisos</button>${later}</div></div>`;
     }
   }
@@ -783,11 +911,13 @@ async function pushBox(box) {
 }
 
 async function profile() {
+  const alias = me.username
+    ? ok(await supabase.from('login_aliases').select('email').maybeSingle())?.email ?? '' : null;
   const el = section(`
     <h2>Perfil</h2>
     <div class="panel profile-head">
       <span class="tile initial big" aria-hidden="true">${initial(me.name)}</span>
-      <div><span>Conectado como</span><strong>${esc(user.email)}</strong></div>
+      <div><span>Conectado como</span><strong>${esc(me.username ?? user.email)}</strong></div>
     </div>
     <form id="f-name" class="card stack">
       <label>Seu nome
@@ -795,6 +925,14 @@ async function profile() {
       </label>
       <button type="submit" class="btn primary">Salvar nome</button>
     </form>
+    ${alias === null ? '' : `<form id="f-alias" class="card stack">
+      <h3>E-mail (opcional)</h3>
+      <p class="muted small">Se quiser, entre também com o seu e-mail. A senha é a mesma.</p>
+      <label>Seu e-mail
+        <input name="email" type="email" autocomplete="email" inputmode="email" value="${esc(alias)}" required>
+      </label>
+      <button type="submit" class="btn primary">Salvar e-mail</button>
+    </form>`}
     <div class="card stack">
       <h3>Notificações</h3>
       <div id="push" class="stack"></div>
@@ -809,6 +947,11 @@ async function profile() {
     ok(await supabase.from('profiles').update({ name }).eq('id', me.id));
     me.name = name;
     toast('Nome salvo!');
+  });
+  const aliasForm = $('#f-alias', el);
+  if (aliasForm) aliasForm.onsubmit = submit(aliasForm, async (f) => {
+    ok(await supabase.rpc('set_login_email', { e: f.email }));
+    toast('Pronto! Agora você também entra com esse e-mail.');
   });
 
   on(el, {
@@ -832,7 +975,7 @@ async function profile() {
 async function start() {
   me = null;
   if (user) {
-    const { data } = await supabase.from('profiles').select('id, name').eq('id', user.id).maybeSingle();
+    const { data } = await supabase.from('profiles').select('id, name, username').eq('id', user.id).maybeSingle();
     me = data ?? { id: user.id, name: user.user_metadata?.name ?? '' };
   }
   render(true);

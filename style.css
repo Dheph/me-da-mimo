@@ -597,3 +597,16 @@ select:focus { outline: none; border-color: var(--pine); box-shadow: 0 0 0 4px r
 }
 .nudge-slim span { flex: 1; }
 .nudge-slim strong { color: var(--cherry-ink); white-space: nowrap; }
+
+/* first access + admin-created users */
+.first-link { margin: .9rem 0 0; font-weight: 600; }
+.first-link a { color: var(--pine); }
+input.code { font-size: 1.4rem; letter-spacing: .3em; text-transform: uppercase; font-weight: 700; }
+.code-card { align-items: flex-start; }
+.code-big { font-size: 2rem; letter-spacing: .25em; color: var(--plum); font-weight: 800; }
+.hint { margin: -.4rem 0 0; color: var(--muted); }
+.hint.good { color: var(--pine); font-weight: 600; }
+.hint.bad { color: var(--cherry-ink); font-weight: 600; }
+.by-email summary { cursor: pointer; font-weight: 700; color: var(--plum); }
+.by-email[open] summary { margin-bottom: .85rem; }
+.by-email .list { margin: 1rem 0 0; }
